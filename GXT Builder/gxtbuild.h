@@ -91,7 +91,7 @@ namespace VC
 
 		virtual size_t GetFormattedContentSize() override
 		{
-			return FormattedContent.size();
+			return FormattedContent.size() * sizeof(character_t);
 		}
 
 		virtual size_t GetEntrySize() override
@@ -105,10 +105,11 @@ namespace VC
 		virtual void	PushFormattedChar( int character ) override;
 
 	private:
+		typedef uint16_t character_t;
 		static const size_t		GXT_ENTRY_NAME_LEN = 8;
 
 		map<std::string, size_t>	Entries;
-		basic_string<uint16_t>		FormattedContent;
+		basic_string<character_t>		FormattedContent;
 	};
 };
 
@@ -128,7 +129,7 @@ namespace SA
 
 		virtual size_t GetFormattedContentSize() override
 		{
-			return FormattedContent.size();
+			return FormattedContent.size() * sizeof(character_t);
 		}
 
 		virtual size_t GetEntrySize() override
@@ -142,8 +143,10 @@ namespace SA
 		virtual void	PushFormattedChar( int character ) override;
 
 	private:
+		typedef uint8_t character_t;
+
 		map<uint32_t, size_t>		Entries;
-		basic_string<uint8_t>		FormattedContent;
+		basic_string<character_t>		FormattedContent;
 	};
 };
 

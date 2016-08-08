@@ -87,7 +87,7 @@ namespace VC
 {
 	bool GXTTable::InsertEntry( const std::string& entryName, size_t offset )
 	{
-		return Entries.insert( std::make_pair( entryName, offset * 2 ) ).second != false;
+		return Entries.insert( std::make_pair( entryName, offset * sizeof(character_t) ) ).second != false;
 	}
 
 	void GXTTable::WriteOutEntries( std::ostream& stream )
@@ -101,12 +101,12 @@ namespace VC
 
 	void GXTTable::WriteOutContent( std::ostream& stream )
 	{
-		stream.write( reinterpret_cast<const char*>( FormattedContent.c_str() ), FormattedContent.size() );
+		stream.write( reinterpret_cast<const char*>( FormattedContent.c_str() ), FormattedContent.size() * sizeof(character_t) );
 	}
 
 	void GXTTable::PushFormattedChar( int character )
 	{
-		FormattedContent.push_back( static_cast<uint16_t>( character ) );
+		FormattedContent.push_back( static_cast<character_t>( character ) );
 	}
 };
 
@@ -115,7 +115,7 @@ namespace SA
 	bool GXTTable::InsertEntry( const std::string& entryName, size_t offset )
 	{
 		uint32_t entryHash = crc32FromUpcaseString( entryName.c_str() );
-		return Entries.insert( std::make_pair( entryHash, offset ) ).second != false;
+		return Entries.insert( std::make_pair( entryHash, offset * sizeof(character_t) ) ).second != false;
 	}
 
 	void GXTTable::WriteOutEntries( std::ostream& stream )
@@ -129,12 +129,12 @@ namespace SA
 
 	void GXTTable::WriteOutContent( std::ostream& stream )
 	{
-		stream.write( reinterpret_cast<const char*>( FormattedContent.c_str() ), FormattedContent.size() );
+		stream.write( reinterpret_cast<const char*>( FormattedContent.c_str() ), FormattedContent.size() * sizeof(character_t) );
 	}
 
 	void GXTTable::PushFormattedChar( int character )
 	{
-		FormattedContent.push_back( static_cast<uint8_t>( character ) );
+		FormattedContent.push_back( static_cast<character_t>( character ) );
 	}
 };
 
