@@ -83,6 +83,62 @@ uint32_t crc32Continue(uint32_t hash, const char* Str)
 }
 
 
+namespace VC
+{
+	bool GXTTable::InsertEntry( const std::string& entryName, size_t offset )
+	{
+		return Entries.insert( std::make_pair( entryName, offset * 2 ) ).second != false;
+	}
+
+	void GXTTable::WriteOutEntries( std::ostream& stream )
+	{
+		for ( auto& it : Entries )
+		{
+			stream.write(reinterpret_cast<const char*>(&it.second), sizeof( it.second ) );
+			stream.write( it.first.c_str(), GXT_ENTRY_NAME_LEN );
+		}
+	}
+
+	void GXTTable::WriteOutContent( std::ostream& stream )
+	{
+		stream.write( reinterpret_cast<const char*>( FormattedContent.c_str() ), FormattedContent.size() );
+	}
+
+	void GXTTable::PushFormattedChar( int character )
+	{
+		FormattedContent.push_back( static_cast<uint16_t>( character ) );
+	}
+};
+
+namespace SA
+{
+	bool GXTTable::InsertEntry( const std::string& entryName, size_t offset )
+	{
+		uint32_t entryHash = crc32FromUpcaseString( entryName.c_str() );
+		return Entries.insert( std::make_pair( entryHash, offset ) ).second != false;
+	}
+
+	void GXTTable::WriteOutEntries( std::ostream& stream )
+	{
+		for ( auto& it : Entries )
+		{
+			stream.write(reinterpret_cast<const char*>(&it.second), sizeof( it.second ) );
+			stream.write(reinterpret_cast<const char*>(&it.first), sizeof( it.first ) );
+		}
+	}
+
+	void GXTTable::WriteOutContent( std::ostream& stream )
+	{
+		stream.write( reinterpret_cast<const char*>( FormattedContent.c_str() ), FormattedContent.size() );
+	}
+
+	void GXTTable::PushFormattedChar( int character )
+	{
+		FormattedContent.push_back( static_cast<uint8_t>( character ) );
+	}
+};
+
+
 static bool compTable(const EntryName& lhs, const EntryName& rhs)
 {
 	if ( !strncmp(lhs.cName, "MAIN", 8) )
@@ -142,7 +198,7 @@ void ParseCharacterMap(const string& szFileName, wchar_t* pCharacterMap)
 		throw szFileName;
 }
 
-void ParseINI(const wstring& szName, tableMap_t& TableMap, wchar_t* pCharacterMap)
+void ParseINI( const wstring& szName, tableMap_t& TableMap, wchar_t* pCharacterMap, eGXTVersion fileVersion )
 {
 	ifstream		InputINI(szName + L".ini", ifstream::in);
 
@@ -157,7 +213,16 @@ void ParseINI(const wstring& szName, tableMap_t& TableMap, wchar_t* pCharacterMa
 			{
 				if ( !bThisLineIsCharMap )
 				{
-					GXTTable		Table(FileLine);
+					std::unique_ptr<GXTTableBase>	Table;
+					switch ( fileVersion )
+					{
+					case GXT_VC:
+						Table = std::make_unique<VC::GXTTable>( FileLine ); 
+						break;
+					case GXT_SA:
+						Table = std::make_unique<SA::GXTTable>( FileLine ); 
+						break;
+					}			
 
 					// Extract name
 					const char*		pName = strrchr(FileLine.c_str(),'\\');
@@ -166,7 +231,7 @@ void ParseINI(const wstring& szName, tableMap_t& TableMap, wchar_t* pCharacterMa
 					else
 						pName = FileLine.c_str();
 
-					TableMap.insert(pair<EntryName,GXTTable>(pName, Table));
+					TableMap.insert( make_pair(pName, move(Table)) );
 
 					wcout << L"Registered '" << pName << L"' GXT table\n";
 				}
@@ -211,10 +276,10 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, ma
 				uint32_t	nEntryHash = crc32FromUpcaseString(EntryName.c_str());
 
 				// Push entry into table map
-				if ( TableIt->second.Entries.insert(make_pair(nEntryHash, utf8::distance(TableIt->second.Content.begin(), TableIt->second.Content.end())/*TableIt->second.Content.size()*/)).second )
+				if ( TableIt->second->InsertEntry( EntryName, utf8::distance( TableIt->second->Content.begin(), TableIt->second->Content.end() ) ) )
 				{
-					TableIt->second.Content.append(EntryContent);
-					TableIt->second.Content.push_back('\0');
+					TableIt->second->Content.append(EntryContent);
+					TableIt->second->Content.push_back('\0');
 
 					// Hash it and perform checks
 					if ( bMasterBuilding )
@@ -276,7 +341,7 @@ void ReadTextFiles(tableMap_t& TableMap, map<uint32_t,VersionControlMap>& Master
 		wchar_t		szWidePath[MAX_PATH];
 		wchar_t		szSavedPath[MAX_PATH];
 
-		strncpy(szTextsPath, it->second.szPath.c_str(), MAX_PATH);
+		strncpy(szTextsPath, it->second->szPath.c_str(), MAX_PATH);
 		mbstowcs(szWidePath, szTextsPath, MAX_PATH);
 
 		GetCurrentDirectory(MAX_PATH, szSavedPath);
@@ -309,20 +374,20 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const wchar_t* pCharacterMap)
 {
 	for ( auto it = TablesMap.begin(); it != TablesMap.end(); it++ )
 	{
-		auto	endIt = utf8::iterator<string::iterator>(it->second.Content.end(), it->second.Content.begin(),  it->second.Content.end());
-		for ( auto strIt = utf8::iterator<string::iterator>(it->second.Content.begin(), it->second.Content.begin(), it->second.Content.end()); strIt != endIt; strIt++ )
+		auto	endIt = utf8::iterator<string::iterator>(it->second->Content.end(), it->second->Content.begin(),  it->second->Content.end());
+		for ( auto strIt = utf8::iterator<string::iterator>(it->second->Content.begin(), it->second->Content.begin(), it->second->Content.end()); strIt != endIt; strIt++ )
 		{
 			bool	bFound = false;
 			if ( *strIt == '\0' )
 			{
-				it->second.FormattedContent.push_back('\0');
+				it->second->PushFormattedChar('\0');
 				continue;
 			}
 			for ( int i = 0; i < CHARACTER_MAP_SIZE; ++i )
 			{
 				if ( *strIt == pCharacterMap[i] )
 				{
-					it->second.FormattedContent.push_back(static_cast<uint8_t>(i + 32));
+					it->second->PushFormattedChar( i + 32 );
 					bFound = true;
 					break;
 				}
@@ -337,12 +402,13 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const wchar_t* pCharacterMap)
 
 // NOTE: Some GXT editors seem to use a different structure (offset differences), but this structure
 // matches original San Andreas GXT structure more!
-void ProduceGXTFile(const wstring& szLangName, const tableMap_t& TablesMap)
+void ProduceGXTFile( const wstring& szLangName, const tableMap_t& TablesMap, eGXTVersion fileVersion )
 {
 	ofstream	OutputFile(szLangName + L".gxt", ofstream::binary);
 	if ( OutputFile.is_open() )
 	{
-		// Header
+		// Header (SA only)
+		if ( fileVersion == GXT_SA )
 		{
 			const char		header[] = { 0x04, 0x00, 0x08, 0x00 };	// 0x080004
 			OutputFile.write(header, sizeof(header));
@@ -350,7 +416,7 @@ void ProduceGXTFile(const wstring& szLangName, const tableMap_t& TablesMap)
 
 		// Write TABL section
 		{
-			DWORD			dwCurrentOffset = 12;
+			DWORD			dwCurrentOffset = fileVersion == GXT_SA ? 12 : 8;
 			const char		header[] = { 'T', 'A', 'B', 'L' };
 			OutputFile.write(header, sizeof(header));
 
@@ -364,11 +430,10 @@ void ProduceGXTFile(const wstring& szLangName, const tableMap_t& TablesMap)
 			{
 				OutputFile.write(it->first.cName, 8);
 				OutputFile.write(reinterpret_cast<const char*>(&dwCurrentOffset), sizeof(dwCurrentOffset));
-				dwCurrentOffset += 16 + (bItsNotMain * 8) + (it->second.Entries.size() * 8) + it->second.FormattedContent.size();
+				dwCurrentOffset += 16 + (bItsNotMain * 8) + (it->second->GetNumEntries() * it->second->GetEntrySize()) + it->second->GetFormattedContentSize();
 
 				// Align to 4 bytes
-				if ( dwCurrentOffset % 4 )
-					dwCurrentOffset += 4 - (dwCurrentOffset % 4);
+				dwCurrentOffset = (dwCurrentOffset + 4 - 1) & ~(4 - 1);
 
 				bItsNotMain = true;
 			}
@@ -386,24 +451,20 @@ void ProduceGXTFile(const wstring& szLangName, const tableMap_t& TablesMap)
 			{
 				const char		header[] = { 'T', 'K', 'E', 'Y' };
 				OutputFile.write(header, sizeof(header));
-				const DWORD		dwBlockSize = it->second.Entries.size() * 8;
+				const DWORD		dwBlockSize = it->second->GetNumEntries() * it->second->GetEntrySize();
 				OutputFile.write(reinterpret_cast<const char*>(&dwBlockSize), sizeof(dwBlockSize));
 
 				// Write TKEY entries
-				for ( auto entIt = it->second.Entries.cbegin(); entIt != it->second.Entries.cend(); entIt++ )
-				{
-					OutputFile.write(reinterpret_cast<const char*>(&entIt->second), 4);
-					OutputFile.write(reinterpret_cast<const char*>(&entIt->first), 4);
-				}
+				it->second->WriteOutEntries( OutputFile );
 			}
 
 			{
 				const char		header[] = { 'T', 'D', 'A', 'T' };
 				OutputFile.write(header, sizeof(header));
-				const DWORD		dwBlockSize = it->second.FormattedContent.size();
+				const size_t	dwBlockSize = it->second->GetFormattedContentSize();;
 				OutputFile.write(reinterpret_cast<const char*>(&dwBlockSize), sizeof(dwBlockSize));
 
-				OutputFile.write(reinterpret_cast<const char*>(it->second.FormattedContent.c_str()), dwBlockSize);
+				it->second->WriteOutContent( OutputFile );
 			}
 
 			// Align to 4 bytes
@@ -431,7 +492,7 @@ void ProduceStats(ofstream& LogFile, const wstring& szLangName, const tableMap_t
 
 		for ( auto it = TablesMap.cbegin(); it != TablesMap.cend(); ++it )
 		{
-			size_t			numTheseEntries = it->second.Entries.size();
+			size_t			numTheseEntries = it->second->GetNumEntries();
 			LogFile << "\t- " << it->first.cName << " - " << numTheseEntries << " entries\n";
 			numEntries += numTheseEntries;
 		}
@@ -505,12 +566,24 @@ bool ValidateSlaveLangUpToDate(const wstring& szLangName)
 	return true;
 }
 
+const wchar_t* GetFormatName( eGXTVersion version )
+{
+	switch ( version )
+	{
+	case GXT_VC:
+		return L"GTA Vice City";
+	case GXT_SA:
+		return L"GTA San Andreas";
+	}
+	return L"Unsupported";
+}
+
 int wmain(int argc, wchar_t* argv[])
 {
 	wcout << L"GXT Builder v1.1\nMade by Silent for GTA VCS PC Edition\n\n";
 	if ( argc >= 2 )
 	{
-		// A map of GXT tables
+				// A map of GXT tables
 		wchar_t								wcCharacterMap[CHARACTER_MAP_SIZE];
 		tableMap_t							TablesMap(compTable);
 		map<uint32_t,VersionControlMap>		MasterCacheMap;
@@ -518,10 +591,30 @@ int wmain(int argc, wchar_t* argv[])
 		wstring								LangName(argv[1]);
 		ofstream							LogFile;
 
+		// Parse commandline arguments
+		eGXTVersion		fileVersion = GXT_SA;
+
+		int	firstStream = 2;
+		for ( int i = 2; i < argc; ++i )
+		{
+			if ( argv[i][0] == '-' )
+			{
+				wstring	tmp = argv[i];
+				firstStream++;
+				if ( tmp == L"-sa" )
+					fileVersion = GXT_SA;
+				else if ( tmp == L"-vc" )
+					fileVersion = GXT_VC;
+			}
+			else
+				break;
+		}
+
 		// Retrieve language name
 		LangName = wstring(LangName.begin()+1+LangName.find_last_of('\\'), LangName.end()-4);
 
 		wcout << L"Building a file from " << LangName << L".ini, please wait...\n";
+		wcout << L"Used format: " << GetFormatName( fileVersion ) << L"\n";
 
 		LogFile.open(LangName + L"_build.log");
 
@@ -532,11 +625,11 @@ int wmain(int argc, wchar_t* argv[])
 
 		try
 		{
-			ParseINI(LangName, TablesMap, wcCharacterMap);
-			if ( argc > 2 )
+			ParseINI( LangName, TablesMap, wcCharacterMap, fileVersion );
+			if ( argc > firstStream )
 			{
 				// Open 'slave' streams
-				for ( int i = 2; i < argc; ++i )
+				for ( int i = firstStream; i < argc; ++i )
 				{
 					wstring			SlaveFileName = argv[i];
 					SlaveFileName += L"_changes.txt";
@@ -578,7 +671,7 @@ int wmain(int argc, wchar_t* argv[])
 				return -1;
 			}
 
-			ProduceGXTFile(LangName, TablesMap);
+			ProduceGXTFile( LangName, TablesMap, fileVersion );
 			if ( argc > 2 )
 				ProduceMasterCache(LangName, MasterCacheMap);
 

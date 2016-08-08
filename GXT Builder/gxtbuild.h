@@ -18,21 +18,40 @@
 #include <shlwapi.h>
 #include <ctime>
 #include "utf8.h"
+#include <memory>
 
 using namespace std;
 
 #define CHARACTER_MAP_SIZE		224
 
-struct GXTTable
+enum eGXTVersion
 {
-	string						szPath;
-	map<uint32_t, uint32_t>		Entries;
-	string						Content;
-	basic_string<uint8_t>		FormattedContent;
+	GXT_III,	// Unsupported
+	GXT_VC,
+	GXT_SA
+};
 
-	GXTTable(const string& szFilePath)
+class GXTTableBase
+{
+public:
+	string						szPath;
+	string						Content;
+
+	GXTTableBase(const string& szFilePath)
 		: szPath(szFilePath)
 	{}
+
+	virtual ~GXTTableBase()
+	{}
+
+public:
+	virtual bool	InsertEntry( const std::string& entryName, size_t offset ) = 0;
+	virtual size_t	GetNumEntries() = 0;
+	virtual size_t	GetFormattedContentSize() = 0;
+	virtual size_t	GetEntrySize() = 0;
+	virtual void	WriteOutEntries( std::ostream& stream ) = 0;
+	virtual void	WriteOutContent( std::ostream& stream ) = 0;
+	virtual void	PushFormattedChar( int character ) = 0;
 };
 
 struct EntryName
@@ -56,6 +75,78 @@ struct VersionControlMap
 	{}
 };
 
-typedef std::map<EntryName, GXTTable, bool(*)(const EntryName&,const EntryName&)>	tableMap_t;
+namespace VC
+{
+	class GXTTable : public GXTTableBase
+	{
+	public:
+		GXTTable( const string& szFilePath )
+			: GXTTableBase( szFilePath )
+		{}
+
+		virtual size_t	GetNumEntries() override
+		{
+			return Entries.size();
+		}
+
+		virtual size_t GetFormattedContentSize() override
+		{
+			return FormattedContent.size();
+		}
+
+		virtual size_t GetEntrySize() override
+		{
+			return GXT_ENTRY_NAME_LEN + sizeof(size_t);
+		}
+	
+		virtual bool	InsertEntry( const std::string& entryName, size_t offset ) override;
+		virtual void	WriteOutEntries( std::ostream& stream ) override;
+		virtual void	WriteOutContent( std::ostream& stream ) override;
+		virtual void	PushFormattedChar( int character ) override;
+
+	private:
+		static const size_t		GXT_ENTRY_NAME_LEN = 8;
+
+		map<std::string, size_t>	Entries;
+		basic_string<uint16_t>		FormattedContent;
+	};
+};
+
+namespace SA
+{
+	class GXTTable : public GXTTableBase
+	{
+	public:
+		GXTTable( const string& szFilePath )
+			: GXTTableBase( szFilePath )
+		{}
+
+		virtual size_t	GetNumEntries() override
+		{
+			return Entries.size();
+		}
+
+		virtual size_t GetFormattedContentSize() override
+		{
+			return FormattedContent.size();
+		}
+
+		virtual size_t GetEntrySize() override
+		{
+			return sizeof(uint32_t) + sizeof(size_t);
+		}
+
+		virtual bool	InsertEntry( const std::string& entryName, size_t offset ) override;
+		virtual void	WriteOutEntries( std::ostream& stream ) override;
+		virtual void	WriteOutContent( std::ostream& stream ) override;
+		virtual void	PushFormattedChar( int character ) override;
+
+	private:
+		map<uint32_t, size_t>		Entries;
+		basic_string<uint8_t>		FormattedContent;
+	};
+};
+
+typedef std::map<EntryName, std::unique_ptr<GXTTableBase>, bool(*)(const EntryName&,const EntryName&)>	tableMap_t;
 
 #endif
