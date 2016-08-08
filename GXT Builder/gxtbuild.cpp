@@ -211,7 +211,7 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, ma
 				uint32_t	nEntryHash = crc32FromUpcaseString(EntryName.c_str());
 
 				// Push entry into table map
-				if ( TableIt->second.Entries.insert(make_pair<uint32_t, uint32_t>(nEntryHash, utf8::distance(TableIt->second.Content.begin(), TableIt->second.Content.end())/*TableIt->second.Content.size()*/)).second )
+				if ( TableIt->second.Entries.insert(make_pair(nEntryHash, utf8::distance(TableIt->second.Content.begin(), TableIt->second.Content.end())/*TableIt->second.Content.size()*/)).second )
 				{
 					TableIt->second.Content.append(EntryContent);
 					TableIt->second.Content.push_back('\0');
@@ -225,7 +225,7 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, ma
 						{
 							// New entry, add it!
 							VersionControlMap		VersionCtrlEntry(nTextHash);
-							MasterMap.insert(make_pair<uint32_t,VersionControlMap>(nEntryHash, VersionCtrlEntry));
+							MasterMap.insert(make_pair(nEntryHash, VersionCtrlEntry));
 
 							// Notify about it in slave lang changes file
 							for ( auto it = SlaveStreams.cbegin(); it != SlaveStreams.cend(); it++ )
