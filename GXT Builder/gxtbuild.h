@@ -23,6 +23,7 @@
 using namespace std;
 
 #define CHARACTER_MAP_SIZE		224
+#define SCRATCH_PAD_SIZE		32767
 
 enum eGXTVersion
 {
@@ -34,10 +35,10 @@ enum eGXTVersion
 class GXTTableBase
 {
 public:
-	string						szPath;
+	wstring						szPath;
 	string						Content;
 
-	GXTTableBase(const string& szFilePath)
+	GXTTableBase(const wstring& szFilePath)
 		: szPath(szFilePath)
 	{}
 
@@ -61,7 +62,13 @@ struct EntryName
 	EntryName(const char* pName)
 	{
 		memset(cName, 0, sizeof(cName));
-		strncpy(cName, pName, 8);
+		strncpy( cName, pName, _countof(cName) );
+	}
+
+	EntryName(const wchar_t* pName)
+	{
+		memset(cName, 0, sizeof(cName));
+		wcstombs( cName, pName, _countof(cName) );
 	}
 };
 
@@ -80,7 +87,7 @@ namespace VC
 	class GXTTable : public GXTTableBase
 	{
 	public:
-		GXTTable( const string& szFilePath )
+		GXTTable( const wstring& szFilePath )
 			: GXTTableBase( szFilePath )
 		{}
 
@@ -118,7 +125,7 @@ namespace SA
 	class GXTTable : public GXTTableBase
 	{
 	public:
-		GXTTable( const string& szFilePath )
+		GXTTable( const wstring& szFilePath )
 			: GXTTableBase( szFilePath )
 		{}
 

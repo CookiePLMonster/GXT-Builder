@@ -165,7 +165,7 @@ static bool MakeSureFileIsValid(ifstream& file)
 	return true;
 }
 
-void ParseCharacterMap(const string& szFileName, wchar_t* pCharacterMap)
+void ParseCharacterMap(const wstring& szFileName, wchar_t* pCharacterMap)
 {
 	ifstream		CharMapFile(szFileName, ifstream::in);
 
@@ -200,55 +200,59 @@ void ParseCharacterMap(const string& szFileName, wchar_t* pCharacterMap)
 
 void ParseINI( const wstring& szName, tableMap_t& TableMap, wchar_t* pCharacterMap, eGXTVersion fileVersion )
 {
-	ifstream		InputINI(szName + L".ini", ifstream::in);
+	std::wstring strFileName = szName + L".ini";
+	std::unique_ptr< wchar_t[] > scratch( new wchar_t[ SCRATCH_PAD_SIZE ] );
 
-	if ( InputINI.is_open() && MakeSureFileIsValid(InputINI) )
+	// Add .\ if path is relative
+	if ( PathIsRelative( strFileName.c_str() ) != FALSE )
 	{
-		// Parse it
-		bool		bThisLineIsCharMap = true;
-		string		FileLine;
-		while ( getline(InputINI, FileLine) )
+		strFileName.insert( 0, L".\\" );
+	}
+
+	// Get attributes
+	GetPrivateProfileString( L"Attribs", L"version", nullptr, scratch.get(), SCRATCH_PAD_SIZE, strFileName.c_str() );
+	if ( scratch[0] != '\0' )
+	{
+		std::wstring strVersion = scratch.get();
+		for ( auto& ch : strVersion )
+			ch = towlower( ch );
+
+		if ( strVersion == L"vc" )
+			fileVersion = GXT_VC;
+		else if ( strVersion == L"sa" )
+			fileVersion = GXT_SA;
+	}
+
+	GetPrivateProfileString( L"Attribs", L"charmap", nullptr, scratch.get(), SCRATCH_PAD_SIZE, strFileName.c_str() );
+	ParseCharacterMap( scratch.get(), pCharacterMap );
+
+	// Read all files list
+	GetPrivateProfileSection( L"Tables", scratch.get(), SCRATCH_PAD_SIZE, strFileName.c_str() );
+
+	for( wchar_t* raw = scratch.get(); *raw != '\0'; ++raw )
+	{
+		// Construct a std::wstring with the line
+		std::wstring strTempFile;
+		do
 		{
-			if ( !FileLine.empty() && FileLine[0] != ';' )
-			{
-				if ( !bThisLineIsCharMap )
-				{
-					std::unique_ptr<GXTTableBase>	Table;
-					switch ( fileVersion )
-					{
-					case GXT_VC:
-						Table = std::make_unique<VC::GXTTable>( FileLine ); 
-						break;
-					case GXT_SA:
-						Table = std::make_unique<SA::GXTTable>( FileLine ); 
-						break;
-					}			
+			strTempFile.push_back( *raw );
+			raw++;
+		}
+		while ( *raw != '\0' );
 
-					// Extract name
-					const char*		pName = strrchr(FileLine.c_str(),'\\');
-					if ( pName )
-						++pName;
-					else
-						pName = FileLine.c_str();
-
-					TableMap.insert( make_pair(pName, move(Table)) );
-
-					wcout << L"Registered '" << pName << L"' GXT table\n";
-				}
-				else
-				{
-					bThisLineIsCharMap = false;
-					ParseCharacterMap(FileLine, pCharacterMap);
-
-					wcout << L"Character map parsed\n";
-				}
-			}
+		std::unique_ptr<GXTTableBase>	Table;
+		switch ( fileVersion )
+		{
+		case GXT_VC:
+			Table = std::make_unique<VC::GXTTable>( strTempFile ); 
+			break;
+		case GXT_SA:
+			Table = std::make_unique<SA::GXTTable>( strTempFile ); 
+			break;
 		}
 
-		InputINI.close();
+		TableMap.insert( make_pair( PathFindFileName( strTempFile.c_str() ), move(Table)) );
 	}
-	else
-		wcerr << L"Could not open " << szName << L".ini!\n";
 }
 
 void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, map<uint32_t,VersionControlMap>& MasterMap, const forward_list<ofstream*>& SlaveStreams, ofstream& LogFile, bool bMasterBuilding)
@@ -337,15 +341,10 @@ void ReadTextFiles(tableMap_t& TableMap, map<uint32_t,VersionControlMap>& Master
 	for ( tableMap_t::iterator it = TableMap.begin(); it != TableMap.end(); it++ )
 	{
 		// Prepare a path
-		char		szTextsPath[MAX_PATH];
-		wchar_t		szWidePath[MAX_PATH];
 		wchar_t		szSavedPath[MAX_PATH];
 
-		strncpy(szTextsPath, it->second->szPath.c_str(), MAX_PATH);
-		mbstowcs(szWidePath, szTextsPath, MAX_PATH);
-
 		GetCurrentDirectory(MAX_PATH, szSavedPath);
-		SetCurrentDirectory(szWidePath);
+		SetCurrentDirectory( it->second->szPath.c_str() );
 
 
 		// Iterate through a directory
@@ -361,7 +360,7 @@ void ReadTextFiles(tableMap_t& TableMap, map<uint32_t,VersionControlMap>& Master
 			FindClose(hFoundFiles);
 		}
 		else
-			throw szWidePath;
+			throw it->second->szPath;
 
 		SetCurrentDirectory(szSavedPath);
 	}
