@@ -1,5 +1,8 @@
 #include "gxtbuild.h"
 
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
 static const uint32_t crc32table[256] =
 {
     0x00000000UL, 0x77073096UL, 0xee0e612cUL, 0x990951baUL, 0x076dc419UL,
@@ -87,17 +90,22 @@ static const size_t CHARACTER_MAP_SIZE = 224;
 
 namespace VC
 {
-	bool GXTTable::InsertEntry( const std::string& entryName, size_t offset )
+	bool GXTTable::InsertEntry( const std::string& entryName, uint32_t offset )
 	{
-		return Entries.insert( std::make_pair( entryName, offset * sizeof(character_t) ) ).second != false;
+		return Entries.insert( std::make_pair( entryName, static_cast<uint32_t>(offset * sizeof(character_t)) ) ).second != false;
 	}
 
 	void GXTTable::WriteOutEntries( std::ostream& stream )
 	{
 		for ( auto& it : Entries )
 		{
+			// Pad string to 8 bytes
+			char buf[GXT_ENTRY_NAME_LEN];
+			memset( buf, 0, sizeof(buf) );
+			strncpy( buf, it.first.c_str(), GXT_ENTRY_NAME_LEN );
+
 			stream.write(reinterpret_cast<const char*>(&it.second), sizeof( it.second ) );
-			stream.write( it.first.c_str(), GXT_ENTRY_NAME_LEN );
+			stream.write( buf, GXT_ENTRY_NAME_LEN );
 		}
 	}
 
@@ -114,10 +122,10 @@ namespace VC
 
 namespace SA
 {
-	bool GXTTable::InsertEntry( const std::string& entryName, size_t offset )
+	bool GXTTable::InsertEntry( const std::string& entryName, uint32_t offset )
 	{
 		uint32_t entryHash = crc32FromUpcaseString( entryName.c_str() );
-		return Entries.insert( std::make_pair( entryHash, offset * sizeof(character_t) ) ).second != false;
+		return Entries.insert( std::make_pair( entryHash, static_cast<uint32_t>(offset * sizeof(character_t)) ) ).second != false;
 	}
 
 	void GXTTable::WriteOutEntries( std::ostream& stream )
@@ -143,10 +151,10 @@ namespace SA
 
 static bool compTable(const EntryName& lhs, const EntryName& rhs)
 {
-	if ( !strncmp(lhs.cName, "MAIN", 8) )
+	if ( strncmp(lhs.cName, "MAIN", _countof(lhs.cName)) == 0 )
 		return true;
 
-	if ( !strncmp(rhs.cName, "MAIN", 8) )
+	if ( strncmp(rhs.cName, "MAIN", _countof(rhs.cName)) == 0 )
 		return false;
 
 	return strncmp(lhs.cName, rhs.cName, 8) < 0;
@@ -173,7 +181,7 @@ void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 
 	if ( CharMapFile.is_open() && MakeSureFileIsValid(CharMapFile) )
 	{
-		for ( int i = 0; i < 14; ++i )
+		for ( size_t i = 0; i < 14; ++i )
 		{
 			std::string					FileLine;
 
@@ -181,7 +189,7 @@ void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 
 			utf8::iterator<std::string::iterator> utf8It(FileLine.begin(), FileLine.begin(), FileLine.end());
 
-			for ( int j = 0; j < 16; ++j )
+			for ( size_t j = 0; j < 16; ++j )
 			{
 				pCharacterMap[i*16+j] = static_cast<wchar_t>(*utf8It);
 
@@ -193,8 +201,6 @@ void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 				}
 			}
 		}
-
-		CharMapFile.close();
 	}
 	else
 		throw szFileName;
@@ -258,7 +264,7 @@ void ParseINI( const std::wstring& szName, tableMap_t& TableMap, wchar_t* pChara
 	}
 }
 
-void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, std::map<uint32_t,VersionControlMap>& MasterMap, const std::forward_list<std::ofstream*>& SlaveStreams, std::ofstream& LogFile, bool bMasterBuilding)
+void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, std::map<uint32_t,VersionControlMap>& MasterMap, const std::forward_list<std::ofstream*>& SlaveStreams, std::ofstream& LogFile, bool bMasterBuilding)
 {
 	std::ifstream		InputFile(pFileName, std::ifstream::in);
 
@@ -283,10 +289,10 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, st
 				uint32_t	nEntryHash = crc32FromUpcaseString(EntryName.c_str());
 
 				// Push entry into table map
-				if ( TableIt->second->InsertEntry( EntryName, utf8::distance( TableIt->second->Content.begin(), TableIt->second->Content.end() ) ) )
+				if ( TableIt.second->InsertEntry( EntryName, static_cast<uint32_t>(utf8::distance( TableIt.second->Content.begin(), TableIt.second->Content.end()) ) ) )
 				{
-					TableIt->second->Content.append(EntryContent);
-					TableIt->second->Content.push_back('\0');
+					TableIt.second->Content.append(EntryContent);
+					TableIt.second->Content.push_back('\0');
 
 					// Hash it and perform checks
 					if ( bMasterBuilding )
@@ -300,9 +306,9 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, st
 							MasterMap.insert(std::make_pair(nEntryHash, VersionCtrlEntry));
 
 							// Notify about it in slave lang changes file
-							for ( auto it = SlaveStreams.cbegin(); it != SlaveStreams.cend(); it++ )
+							for ( const auto& it : SlaveStreams )
 							{
-								(**it) << EntryName << " - ADDED to table " << TableIt->first.cName << std::endl;
+								(*it) << EntryName << " - ADDED to table " << TableIt.first.cName << std::endl;
 							}
 						}
 						else
@@ -312,9 +318,9 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, st
 							{
 								// Modified entry!
 								// Notify about it in slave lang changes file
-								for ( auto it = SlaveStreams.cbegin(); it != SlaveStreams.cend(); it++ )
+								for ( const auto& it : SlaveStreams )
 								{
-									(**it) << EntryName << " - MODIFIED in table " << TableIt->first.cName << std::endl;
+									(*it) << EntryName << " - MODIFIED in table " << TableIt.first.cName << std::endl;
 								}
 
 								ThisEntryIt->second.TextHash = nTextHash;
@@ -332,8 +338,6 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, st
 				}
 			}
 		}
-
-		InputFile.close();
 	}
 	else
 		throw pFileName;
@@ -341,13 +345,13 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, st
 
 void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& MasterMap, const std::forward_list<std::ofstream*>& SlaveStreams, std::ofstream& LogFile, bool bMasterBuilding)
 {
-	for ( tableMap_t::iterator it = TableMap.begin(); it != TableMap.end(); it++ )
+	for ( auto& it : TableMap )
 	{
 		// Prepare a path
 		wchar_t		szSavedPath[MAX_PATH];
 
 		GetCurrentDirectory(MAX_PATH, szSavedPath);
-		SetCurrentDirectory( it->second->szPath.c_str() );
+		SetCurrentDirectory( it.second->szPath.c_str() );
 
 
 		// Iterate through a directory
@@ -363,7 +367,7 @@ void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& M
 			FindClose(hFoundFiles);
 		}
 		else
-			throw it->second->szPath;
+			throw it.second->szPath;
 
 		SetCurrentDirectory(szSavedPath);
 	}
@@ -374,22 +378,23 @@ void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& M
 
 void ApplyCharacterMap(tableMap_t& TablesMap, const wchar_t* pCharacterMap)
 {
-	for ( auto it = TablesMap.begin(); it != TablesMap.end(); it++ )
+	for ( auto& it : TablesMap )
 	{
-		auto	endIt = utf8::iterator<std::string::iterator>(it->second->Content.end(), it->second->Content.begin(),  it->second->Content.end());
-		for ( auto strIt = utf8::iterator<std::string::iterator>(it->second->Content.begin(), it->second->Content.begin(), it->second->Content.end()); strIt != endIt; strIt++ )
+		for ( auto strIt = utf8::iterator<std::string::iterator>(it.second->Content.begin(), it.second->Content.begin(), it.second->Content.end()),
+				endIt = utf8::iterator<std::string::iterator>(it.second->Content.end(), it.second->Content.begin(),  it.second->Content.end());
+				strIt != endIt; ++strIt )
 		{
 			bool	bFound = false;
 			if ( *strIt == '\0' )
 			{
-				it->second->PushFormattedChar('\0');
+				it.second->PushFormattedChar('\0');
 				continue;
 			}
 			for ( size_t i = 0; i < CHARACTER_MAP_SIZE; ++i )
 			{
 				if ( *strIt == pCharacterMap[i] )
 				{
-					it->second->PushFormattedChar( i + 32 );
+					it.second->PushFormattedChar( static_cast<int>(i) + 32 );
 					bFound = true;
 					break;
 				}
@@ -418,21 +423,21 @@ void ProduceGXTFile( const std::wstring& szLangName, const tableMap_t& TablesMap
 
 		// Write TABL section
 		{
-			DWORD			dwCurrentOffset = fileVersion == GXT_SA ? 12 : 8;
+			uint32_t		dwCurrentOffset = fileVersion == GXT_SA ? 12 : 8;
 			const char		header[] = { 'T', 'A', 'B', 'L' };
 			OutputFile.write(header, sizeof(header));
 
-			const DWORD		dwBlockSize = TablesMap.size() * 12;
+			const uint32_t	dwBlockSize = static_cast<uint32_t>(TablesMap.size() * 12);
 			OutputFile.write(reinterpret_cast<const char*>(&dwBlockSize), sizeof(dwBlockSize));
 
 			dwCurrentOffset += dwBlockSize;
 
 			bool			bItsNotMain = false;
-			for ( auto it = TablesMap.cbegin(); it != TablesMap.cend(); it++ )
+			for ( auto& it : TablesMap )
 			{
-				OutputFile.write(it->first.cName, 8);
+				OutputFile.write(it.first.cName, sizeof(it.first.cName));
 				OutputFile.write(reinterpret_cast<const char*>(&dwCurrentOffset), sizeof(dwCurrentOffset));
-				dwCurrentOffset += 16 + (bItsNotMain * 8) + (it->second->GetNumEntries() * it->second->GetEntrySize()) + it->second->GetFormattedContentSize();
+				dwCurrentOffset += static_cast<uint32_t>( 16 + (bItsNotMain * 8) + (it.second->GetNumEntries() * it.second->GetEntrySize()) + it.second->GetFormattedContentSize() );
 
 				// Align to 4 bytes
 				dwCurrentOffset = (dwCurrentOffset + 4 - 1) & ~(4 - 1);
@@ -443,30 +448,30 @@ void ProduceGXTFile( const std::wstring& szLangName, const tableMap_t& TablesMap
 
 		// Write TKEY and TDAT sections
 		bool			bItsNotMain = false;
-		for ( tableMap_t::const_iterator it = TablesMap.cbegin(); it != TablesMap.cend(); it++ )
+		for ( const auto& it : TablesMap )
 		{
 			if ( bItsNotMain )
-				OutputFile.write(it->first.cName, 8);
+				OutputFile.write(it.first.cName, sizeof(it.first.cName));
 			else
 				bItsNotMain = true;
 
 			{
 				const char		header[] = { 'T', 'K', 'E', 'Y' };
 				OutputFile.write(header, sizeof(header));
-				const DWORD		dwBlockSize = it->second->GetNumEntries() * it->second->GetEntrySize();
+				const uint32_t	dwBlockSize = static_cast<uint32_t>(it.second->GetNumEntries() * it.second->GetEntrySize());
 				OutputFile.write(reinterpret_cast<const char*>(&dwBlockSize), sizeof(dwBlockSize));
 
 				// Write TKEY entries
-				it->second->WriteOutEntries( OutputFile );
+				it.second->WriteOutEntries( OutputFile );
 			}
 
 			{
 				const char		header[] = { 'T', 'D', 'A', 'T' };
 				OutputFile.write(header, sizeof(header));
-				const size_t	dwBlockSize = it->second->GetFormattedContentSize();;
+				const uint32_t	dwBlockSize = static_cast<uint32_t>(it.second->GetFormattedContentSize());
 				OutputFile.write(reinterpret_cast<const char*>(&dwBlockSize), sizeof(dwBlockSize));
 
-				it->second->WriteOutContent( OutputFile );
+				it.second->WriteOutContent( OutputFile );
 			}
 
 			// Align to 4 bytes
@@ -475,7 +480,6 @@ void ProduceGXTFile( const std::wstring& szLangName, const tableMap_t& TablesMap
 		}
 
 		std::wcout << L"Finished building " << szLangName << L".gxt!\n";
-		OutputFile.close();
 	}
 	else
 		throw szLangName;
@@ -492,10 +496,10 @@ void ProduceStats(std::ofstream& LogFile, const std::wstring& szLangName, const 
 
 		LogFile << "\nBuilding finished at " << ctime(&currentTime) << "GXT contains " << TablesMap.size() << " tables:\n";
 
-		for ( auto it = TablesMap.cbegin(); it != TablesMap.cend(); ++it )
+		for ( const auto& it : TablesMap )
 		{
-			size_t			numTheseEntries = it->second->GetNumEntries();
-			LogFile << "\t- " << it->first.cName << " - " << numTheseEntries << " entries\n";
+			size_t			numTheseEntries = it.second->GetNumEntries();
+			LogFile << "\t- " << it.first.cName << " - " << numTheseEntries << " entries\n";
 			numEntries += numTheseEntries;
 		}
 
@@ -523,7 +527,6 @@ void ReadMasterTable(const std::wstring& szMasterLangName, std::map<uint32_t,Ver
 				break;
 			MasterMap.insert(OneEntry);
 		}
-		CacheFile.close();
 	}
 }
 
@@ -537,15 +540,13 @@ void ProduceMasterCache(const std::wstring& szMasterLangName, std::map<uint32_t,
 	std::ofstream	CacheFile(wcHashText, std::ofstream::binary);
 	if ( CacheFile.is_open() )
 	{
-		for ( auto it = MasterMap.cbegin(); it != MasterMap.cend(); it++ )
+		for ( const auto& it : MasterMap )
 		{
-			if ( it->second.bLinked )
+			if ( it.second.bLinked )
 			{
-				std::pair<uint32_t,VersionControlMap>		OneEntry = *it;
-				CacheFile.write(reinterpret_cast<const char*>(&OneEntry), 8);
+				CacheFile.write(reinterpret_cast<const char*>(&it), sizeof(it));
 			}
 		}
-		CacheFile.close();
 	}
 }
 
@@ -580,7 +581,8 @@ const wchar_t* GetFormatName( eGXTVersion version )
 
 int wmain(int argc, wchar_t* argv[])
 {
-	std::wcout << L"GXT Builder v1.1\nMade by Silent for GTA VCS PC Edition\n\n";
+	std::ios_base::sync_with_stdio(false);
+	std::wcout << L"GXT Builder v1.2\nMade by Silent\n";
 	if ( argc >= 2 )
 	{
 				// A map of GXT tables
@@ -682,8 +684,6 @@ int wmain(int argc, wchar_t* argv[])
 			std::wcerr << L"Unknown error occured!\n";
 			return 1;
 		}
-
-		LogFile.close();
 	}
 	else
 		std::wcerr << L"Input file not specified!\n";

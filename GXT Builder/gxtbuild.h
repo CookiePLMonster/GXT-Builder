@@ -1,13 +1,7 @@
 #ifndef __GXTBUILD_H
 #define __GXTBUILD_H
 
-#define WIN32_LEAN_AND_MEAN
 #define _CRT_SECURE_NO_WARNINGS
-
-#define WINVER 0x0500
-#define _WIN32_WINNT 0x0500
-
-#include <windows.h>
 #include <cstdint>
 #include <cctype>
 #include <string>
@@ -41,7 +35,7 @@ public:
 	{}
 
 public:
-	virtual bool	InsertEntry( const std::string& entryName, size_t offset ) = 0;
+	virtual bool	InsertEntry( const std::string& entryName, uint32_t offset ) = 0;
 	virtual size_t	GetNumEntries() = 0;
 	virtual size_t	GetFormattedContentSize() = 0;
 	virtual size_t	GetEntrySize() = 0;
@@ -98,10 +92,10 @@ namespace VC
 
 		virtual size_t GetEntrySize() override
 		{
-			return GXT_ENTRY_NAME_LEN + sizeof(size_t);
+			return GXT_ENTRY_NAME_LEN + sizeof(uint32_t);
 		}
 	
-		virtual bool	InsertEntry( const std::string& entryName, size_t offset ) override;
+		virtual bool	InsertEntry( const std::string& entryName, uint32_t offset ) override;
 		virtual void	WriteOutEntries( std::ostream& stream ) override;
 		virtual void	WriteOutContent( std::ostream& stream ) override;
 		virtual void	PushFormattedChar( int character ) override;
@@ -110,7 +104,7 @@ namespace VC
 		typedef uint16_t character_t;
 		static const size_t		GXT_ENTRY_NAME_LEN = 8;
 
-		std::map<std::string, size_t>	Entries;
+		std::map<std::string, uint32_t>	Entries;
 		std::basic_string<character_t>	FormattedContent;
 	};
 };
@@ -136,10 +130,10 @@ namespace SA
 
 		virtual size_t GetEntrySize() override
 		{
-			return sizeof(uint32_t) + sizeof(size_t);
+			return sizeof(uint32_t) + sizeof(uint32_t);
 		}
 
-		virtual bool	InsertEntry( const std::string& entryName, size_t offset ) override;
+		virtual bool	InsertEntry( const std::string& entryName, uint32_t offset ) override;
 		virtual void	WriteOutEntries( std::ostream& stream ) override;
 		virtual void	WriteOutContent( std::ostream& stream ) override;
 		virtual void	PushFormattedChar( int character ) override;
@@ -147,7 +141,7 @@ namespace SA
 	private:
 		typedef uint8_t character_t;
 
-		std::map<uint32_t, size_t>		Entries;
+		std::map<uint32_t, uint32_t>	Entries;
 		std::basic_string<character_t>	FormattedContent;
 	};
 };
