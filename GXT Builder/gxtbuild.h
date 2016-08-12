@@ -20,11 +20,6 @@
 #include "utf8.h"
 #include <memory>
 
-using namespace std;
-
-#define CHARACTER_MAP_SIZE		224
-#define SCRATCH_PAD_SIZE		32767
-
 enum eGXTVersion
 {
 	GXT_III,	// Unsupported
@@ -35,10 +30,10 @@ enum eGXTVersion
 class GXTTableBase
 {
 public:
-	wstring						szPath;
-	string						Content;
+	std::wstring			szPath;
+	std::string				Content;
 
-	GXTTableBase(const wstring& szFilePath)
+	GXTTableBase(const std::wstring& szFilePath)
 		: szPath(szFilePath)
 	{}
 
@@ -87,7 +82,7 @@ namespace VC
 	class GXTTable : public GXTTableBase
 	{
 	public:
-		GXTTable( const wstring& szFilePath )
+		GXTTable( const std::wstring& szFilePath )
 			: GXTTableBase( szFilePath )
 		{}
 
@@ -115,8 +110,8 @@ namespace VC
 		typedef uint16_t character_t;
 		static const size_t		GXT_ENTRY_NAME_LEN = 8;
 
-		map<std::string, size_t>	Entries;
-		basic_string<character_t>		FormattedContent;
+		std::map<std::string, size_t>	Entries;
+		std::basic_string<character_t>	FormattedContent;
 	};
 };
 
@@ -125,7 +120,7 @@ namespace SA
 	class GXTTable : public GXTTableBase
 	{
 	public:
-		GXTTable( const wstring& szFilePath )
+		GXTTable( const std:: wstring& szFilePath )
 			: GXTTableBase( szFilePath )
 		{}
 
@@ -152,8 +147,8 @@ namespace SA
 	private:
 		typedef uint8_t character_t;
 
-		map<uint32_t, size_t>		Entries;
-		basic_string<character_t>		FormattedContent;
+		std::map<uint32_t, size_t>		Entries;
+		std::basic_string<character_t>	FormattedContent;
 	};
 };
 

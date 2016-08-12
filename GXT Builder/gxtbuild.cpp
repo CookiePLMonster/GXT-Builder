@@ -82,6 +82,8 @@ uint32_t crc32Continue(uint32_t hash, const char* Str)
   return hash;
 }
 
+static const size_t CHARACTER_MAP_SIZE = 224;
+
 
 namespace VC
 {
@@ -150,34 +152,34 @@ static bool compTable(const EntryName& lhs, const EntryName& rhs)
 	return strncmp(lhs.cName, rhs.cName, 8) < 0;
 }
 
-static bool MakeSureFileIsValid(ifstream& file)
+static bool MakeSureFileIsValid(std::ifstream& file)
 {
-	istreambuf_iterator<char> it(file.rdbuf());
-	istreambuf_iterator<char> eos;
+	std::istreambuf_iterator<char> it(file.rdbuf());
+	std::istreambuf_iterator<char> eos;
 	if ( !utf8::is_valid(it, eos) )
 		return false;
 
-	file.seekg(0, ios_base::beg);
+	file.seekg(0, std::ios_base::beg);
 
 	// Skip BOM (if exists)
 	// starts_with_bom advances the pointer all the time, so we have to call seekg anyway
-	file.seekg(utf8::starts_with_bom(it, eos) ? 3 : 0, ios_base::beg);
+	file.seekg(utf8::starts_with_bom(it, eos) ? 3 : 0, std::ios_base::beg);
 	return true;
 }
 
-void ParseCharacterMap(const wstring& szFileName, wchar_t* pCharacterMap)
+void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 {
-	ifstream		CharMapFile(szFileName, ifstream::in);
+	std::ifstream		CharMapFile(szFileName, std::ifstream::in);
 
 	if ( CharMapFile.is_open() && MakeSureFileIsValid(CharMapFile) )
 	{
 		for ( int i = 0; i < 14; ++i )
 		{
-			string					FileLine;
+			std::string					FileLine;
 
-			getline(CharMapFile, FileLine);
+			std::getline(CharMapFile, FileLine);
 
-			utf8::iterator<string::iterator> utf8It(FileLine.begin(), FileLine.begin(), FileLine.end());
+			utf8::iterator<std::string::iterator> utf8It(FileLine.begin(), FileLine.begin(), FileLine.end());
 
 			for ( int j = 0; j < 16; ++j )
 			{
@@ -198,8 +200,9 @@ void ParseCharacterMap(const wstring& szFileName, wchar_t* pCharacterMap)
 		throw szFileName;
 }
 
-void ParseINI( const wstring& szName, tableMap_t& TableMap, wchar_t* pCharacterMap, eGXTVersion fileVersion )
+void ParseINI( const std::wstring& szName, tableMap_t& TableMap, wchar_t* pCharacterMap, eGXTVersion fileVersion )
 {
+	const size_t SCRATCH_PAD_SIZE = 32767;
 	std::wstring strFileName = szName + L".ini";
 	std::unique_ptr< wchar_t[] > scratch( new wchar_t[ SCRATCH_PAD_SIZE ] );
 
@@ -255,28 +258,28 @@ void ParseINI( const wstring& szName, tableMap_t& TableMap, wchar_t* pCharacterM
 	}
 }
 
-void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, map<uint32_t,VersionControlMap>& MasterMap, const forward_list<ofstream*>& SlaveStreams, ofstream& LogFile, bool bMasterBuilding)
+void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, std::map<uint32_t,VersionControlMap>& MasterMap, const std::forward_list<std::ofstream*>& SlaveStreams, std::ofstream& LogFile, bool bMasterBuilding)
 {
-	ifstream		InputFile(pFileName, ifstream::in);
+	std::ifstream		InputFile(pFileName, std::ifstream::in);
 
 	if ( InputFile.is_open() )
 	{
-		wcout << L"Reading entries from " << pFileName << L"...\n";
+		std::wcout << L"Reading entries from " << pFileName << L"...\n";
 
 		if ( !MakeSureFileIsValid(InputFile) )
 		{
-			wcerr << L"ERROR: File " << pFileName << " contains invalid UTF-8 characters!\n";
+			std::wcerr << L"ERROR: File " << pFileName << " contains invalid UTF-8 characters!\n";
 			return;
 		}
 
-		string		FileLine;
-		while ( getline(InputFile, FileLine) )
+		std::string		FileLine;
+		while ( std::getline(InputFile, FileLine) )
 		{
 			if ( !FileLine.empty() && FileLine[0] != '#' )
 			{
 				// Extract entry name
-				string		EntryName(FileLine.begin(), FileLine.begin()+FileLine.find('\t'));
-				string		EntryContent(FileLine.begin()+FileLine.find('\t')+1, FileLine.end());
+				std::string		EntryName(FileLine.begin(), FileLine.begin()+FileLine.find('\t'));
+				std::string		EntryContent(FileLine.begin()+FileLine.find('\t')+1, FileLine.end());
 				uint32_t	nEntryHash = crc32FromUpcaseString(EntryName.c_str());
 
 				// Push entry into table map
@@ -294,12 +297,12 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, ma
 						{
 							// New entry, add it!
 							VersionControlMap		VersionCtrlEntry(nTextHash);
-							MasterMap.insert(make_pair(nEntryHash, VersionCtrlEntry));
+							MasterMap.insert(std::make_pair(nEntryHash, VersionCtrlEntry));
 
 							// Notify about it in slave lang changes file
 							for ( auto it = SlaveStreams.cbegin(); it != SlaveStreams.cend(); it++ )
 							{
-								(**it) << EntryName << " - ADDED to table " << TableIt->first.cName << endl;
+								(**it) << EntryName << " - ADDED to table " << TableIt->first.cName << std::endl;
 							}
 						}
 						else
@@ -311,7 +314,7 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, ma
 								// Notify about it in slave lang changes file
 								for ( auto it = SlaveStreams.cbegin(); it != SlaveStreams.cend(); it++ )
 								{
-									(**it) << EntryName << " - MODIFIED in table " << TableIt->first.cName << endl;
+									(**it) << EntryName << " - MODIFIED in table " << TableIt->first.cName << std::endl;
 								}
 
 								ThisEntryIt->second.TextHash = nTextHash;
@@ -323,8 +326,8 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, ma
 				{
 					if ( LogFile.is_open() )
 					{
-						wstring		WideFileName(pFileName);
-						LogFile << "Entry " << EntryName << " duplicated in " << string(WideFileName.begin(), WideFileName.end()) << " file!\n";
+						std::wstring		WideFileName(pFileName);
+						LogFile << "Entry " << EntryName << " duplicated in " << std::string(WideFileName.begin(), WideFileName.end()) << " file!\n";
 					}
 				}
 			}
@@ -336,7 +339,7 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::iterator& TableIt, ma
 		throw pFileName;
 }
 
-void ReadTextFiles(tableMap_t& TableMap, map<uint32_t,VersionControlMap>& MasterMap, const forward_list<ofstream*>& SlaveStreams, ofstream& LogFile, bool bMasterBuilding)
+void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& MasterMap, const std::forward_list<std::ofstream*>& SlaveStreams, std::ofstream& LogFile, bool bMasterBuilding)
 {
 	for ( tableMap_t::iterator it = TableMap.begin(); it != TableMap.end(); it++ )
 	{
@@ -373,8 +376,8 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const wchar_t* pCharacterMap)
 {
 	for ( auto it = TablesMap.begin(); it != TablesMap.end(); it++ )
 	{
-		auto	endIt = utf8::iterator<string::iterator>(it->second->Content.end(), it->second->Content.begin(),  it->second->Content.end());
-		for ( auto strIt = utf8::iterator<string::iterator>(it->second->Content.begin(), it->second->Content.begin(), it->second->Content.end()); strIt != endIt; strIt++ )
+		auto	endIt = utf8::iterator<std::string::iterator>(it->second->Content.end(), it->second->Content.begin(),  it->second->Content.end());
+		for ( auto strIt = utf8::iterator<std::string::iterator>(it->second->Content.begin(), it->second->Content.begin(), it->second->Content.end()); strIt != endIt; strIt++ )
 		{
 			bool	bFound = false;
 			if ( *strIt == '\0' )
@@ -382,7 +385,7 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const wchar_t* pCharacterMap)
 				it->second->PushFormattedChar('\0');
 				continue;
 			}
-			for ( int i = 0; i < CHARACTER_MAP_SIZE; ++i )
+			for ( size_t i = 0; i < CHARACTER_MAP_SIZE; ++i )
 			{
 				if ( *strIt == pCharacterMap[i] )
 				{
@@ -401,9 +404,9 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const wchar_t* pCharacterMap)
 
 // NOTE: Some GXT editors seem to use a different structure (offset differences), but this structure
 // matches original San Andreas GXT structure more!
-void ProduceGXTFile( const wstring& szLangName, const tableMap_t& TablesMap, eGXTVersion fileVersion )
+void ProduceGXTFile( const std::wstring& szLangName, const tableMap_t& TablesMap, eGXTVersion fileVersion )
 {
-	ofstream	OutputFile(szLangName + L".gxt", ofstream::binary);
+	std::ofstream	OutputFile(szLangName + L".gxt", std::ofstream::binary);
 	if ( OutputFile.is_open() )
 	{
 		// Header (SA only)
@@ -468,17 +471,17 @@ void ProduceGXTFile( const wstring& szLangName, const tableMap_t& TablesMap, eGX
 
 			// Align to 4 bytes
 			if ( OutputFile.tellp() % 4 )
-				OutputFile.seekp(4 - (OutputFile.tellp() % 4), ios_base::cur);
+				OutputFile.seekp(4 - (OutputFile.tellp() % 4), std::ios_base::cur);
 		}
 
-		wcout << L"Finished building " << szLangName << L".gxt!\n";
+		std::wcout << L"Finished building " << szLangName << L".gxt!\n";
 		OutputFile.close();
 	}
 	else
 		throw szLangName;
 }
 
-void ProduceStats(ofstream& LogFile, const wstring& szLangName, const tableMap_t& TablesMap)
+void ProduceStats(std::ofstream& LogFile, const std::wstring& szLangName, const tableMap_t& TablesMap)
 {
 	if ( LogFile.is_open() )
 	{
@@ -497,23 +500,23 @@ void ProduceStats(ofstream& LogFile, const wstring& szLangName, const tableMap_t
 		}
 
 		LogFile << '\n' << numEntries << " entries total.";
-		wcout << szLangName << L"_build.log generated.\n";
+		std::wcout << szLangName << L"_build.log generated.\n";
 	}
 }
 
-void ReadMasterTable(const wstring& szMasterLangName, map<uint32_t,VersionControlMap>& MasterMap)
+void ReadMasterTable(const std::wstring& szMasterLangName, std::map<uint32_t,VersionControlMap>& MasterMap)
 {
-	string								szNarrowLangName(szMasterLangName.begin(), szMasterLangName.end());
+	std::string							szNarrowLangName(szMasterLangName.begin(), szMasterLangName.end());
 	wchar_t								wcHashText[MAX_PATH];
 
 	swprintf(wcHashText, MAX_PATH, L"cache\\%X", crc32FromString(szNarrowLangName.c_str()));
 
-	ifstream	CacheFile(wcHashText, ifstream::binary);
+	std::ifstream	CacheFile(wcHashText, std::ifstream::binary);
 	if ( CacheFile.is_open() )
 	{
 		for ( ;; )
 		{
-			pair<uint32_t, VersionControlMap>	OneEntry;
+			std::pair<uint32_t, VersionControlMap>	OneEntry;
 			OneEntry.second.bLinked = false;
 			CacheFile.read(reinterpret_cast<char*>(&OneEntry), 8);
 			if ( CacheFile.eof() )
@@ -524,21 +527,21 @@ void ReadMasterTable(const wstring& szMasterLangName, map<uint32_t,VersionContro
 	}
 }
 
-void ProduceMasterCache(const wstring& szMasterLangName, map<uint32_t,VersionControlMap>& MasterMap)
+void ProduceMasterCache(const std::wstring& szMasterLangName, std::map<uint32_t,VersionControlMap>& MasterMap)
 {
-	string								szNarrowLangName(szMasterLangName.begin(), szMasterLangName.end());
+	std::string								szNarrowLangName(szMasterLangName.begin(), szMasterLangName.end());
 	wchar_t								wcHashText[MAX_PATH];
 
 	swprintf(wcHashText, MAX_PATH, L"cache\\%X", crc32FromString(szNarrowLangName.c_str()));
 
-	ofstream	CacheFile(wcHashText, ofstream::binary);
+	std::ofstream	CacheFile(wcHashText, std::ofstream::binary);
 	if ( CacheFile.is_open() )
 	{
 		for ( auto it = MasterMap.cbegin(); it != MasterMap.cend(); it++ )
 		{
 			if ( it->second.bLinked )
 			{
-				pair<uint32_t,VersionControlMap>		OneEntry = *it;
+				std::pair<uint32_t,VersionControlMap>		OneEntry = *it;
 				CacheFile.write(reinterpret_cast<const char*>(&OneEntry), 8);
 			}
 		}
@@ -546,21 +549,19 @@ void ProduceMasterCache(const wstring& szMasterLangName, map<uint32_t,VersionCon
 	}
 }
 
-bool ValidateSlaveLangUpToDate(const wstring& szLangName)
+bool ValidateSlaveLangUpToDate(const std::wstring& szLangName)
 {
-	ifstream	ChangesFile(szLangName + L"_changes.txt");
+	std::ifstream	ChangesFile(szLangName + L"_changes.txt");
 	if ( ChangesFile.is_open() )
 	{
-		string		FileLine;
-		while ( getline(ChangesFile, FileLine) )
+		std::string		FileLine;
+		while ( std::getline(ChangesFile, FileLine) )
 		{
 			if ( !FileLine.empty() && FileLine[0] != '#' )
 			{
-				ChangesFile.close();
 				return false;
 			}
 		}
-		ChangesFile.close();
 	}
 	return true;
 }
@@ -579,16 +580,16 @@ const wchar_t* GetFormatName( eGXTVersion version )
 
 int wmain(int argc, wchar_t* argv[])
 {
-	wcout << L"GXT Builder v1.1\nMade by Silent for GTA VCS PC Edition\n\n";
+	std::wcout << L"GXT Builder v1.1\nMade by Silent for GTA VCS PC Edition\n\n";
 	if ( argc >= 2 )
 	{
 				// A map of GXT tables
 		wchar_t								wcCharacterMap[CHARACTER_MAP_SIZE];
 		tableMap_t							TablesMap(compTable);
-		map<uint32_t,VersionControlMap>		MasterCacheMap;
-		forward_list<ofstream*>				SlaveStreamsList;
-		wstring								LangName(argv[1]);
-		ofstream							LogFile;
+		std::map<uint32_t,VersionControlMap>	MasterCacheMap;
+		std::forward_list<std::ofstream*>		SlaveStreamsList;
+		std::wstring							LangName(argv[1]);
+		std::ofstream							LogFile;
 
 		// Parse commandline arguments
 		eGXTVersion		fileVersion = GXT_SA;
@@ -598,7 +599,7 @@ int wmain(int argc, wchar_t* argv[])
 		{
 			if ( argv[i][0] == '-' )
 			{
-				wstring	tmp = argv[i];
+				std::wstring	tmp = argv[i];
 				firstStream++;
 				if ( tmp == L"-sa" )
 					fileVersion = GXT_SA;
@@ -610,17 +611,17 @@ int wmain(int argc, wchar_t* argv[])
 		}
 
 		// Retrieve language name
-		LangName = wstring(LangName.begin()+1+LangName.find_last_of('\\'), LangName.end()-4);
+		LangName = std::wstring(LangName.begin()+1+LangName.find_last_of('\\'), LangName.end()-4);
 
-		wcout << L"Building a file from " << LangName << L".ini, please wait...\n";
-		wcout << L"Used format: " << GetFormatName( fileVersion ) << L"\n";
+		std::wcout << L"Building a file from " << LangName << L".ini, please wait...\n";
+		std::wcout << L"Used format: " << GetFormatName( fileVersion ) << L"\n";
 
 		LogFile.open(LangName + L"_build.log");
 
 		time_t			currentTime;
 
 		time(&currentTime);
-		LogFile << string(LangName.begin(), LangName.end()) << ".gxt building started at " << ctime(&currentTime);
+		LogFile << std::string(LangName.begin(), LangName.end()) << ".gxt building started at " << ctime(&currentTime);
 
 		try
 		{
@@ -630,10 +631,10 @@ int wmain(int argc, wchar_t* argv[])
 				// Open 'slave' streams
 				for ( int i = firstStream; i < argc; ++i )
 				{
-					wstring			SlaveFileName = argv[i];
+					std::wstring			SlaveFileName = argv[i];
 					SlaveFileName += L"_changes.txt";
 
-					ofstream*		SlaveStream = new ofstream(SlaveFileName, ofstream::app);
+					std::ofstream*		SlaveStream = new std::ofstream(SlaveFileName, std::ofstream::app);
 					if ( SlaveStream->is_open() )
 					{
 						SlaveStream->put('\n');
@@ -646,8 +647,8 @@ int wmain(int argc, wchar_t* argv[])
 			{
 				if ( !ValidateSlaveLangUpToDate(LangName) )
 				{
-					wstring			Error(L"Error: This language isn't up to date - please check " + LangName + L"_changes.txt for the latest English language updates, apply them to this language translation files and try again.");
-					wcerr << L"Error: Language file not updated to cover English updates!\n";
+					std::wstring			Error(L"Error: This language isn't up to date - please check " + LangName + L"_changes.txt for the latest English language updates, apply them to this language translation files and try again.");
+					std::wcerr << L"Error: Language file not updated to cover English updates!\n";
 					MessageBox(nullptr, Error.c_str(), L"GXT Builder", MB_OK | MB_ICONWARNING);
 					return 0;
 				}
@@ -661,12 +662,12 @@ int wmain(int argc, wchar_t* argv[])
 			}
 			catch (uint32_t cChar)
 			{
-				wcerr << L"Error: Can't locate character \"" << static_cast<wchar_t>(cChar) << "\" (" << cChar << L") in a character map!\n";
+				std::wcerr << L"Error: Can't locate character \"" << static_cast<wchar_t>(cChar) << "\" (" << cChar << L") in a character map!\n";
 				return -1;
 			}
 			catch (const wchar_t* pDir)
 			{
-				wcerr << L"Error: Directory " << pDir << L" not found or empty!\n";
+				std::wcerr << L"Error: Directory " << pDir << L" not found or empty!\n";
 				return -1;
 			}
 
@@ -678,14 +679,14 @@ int wmain(int argc, wchar_t* argv[])
 		}
 		catch (...)
 		{
-			wcerr << L"Unknown error occured!\n";
+			std::wcerr << L"Unknown error occured!\n";
 			return 1;
 		}
 
 		LogFile.close();
 	}
 	else
-		wcerr << L"Input file not specified!\n";
+		std::wcerr << L"Input file not specified!\n";
 
 	return 0;
 }
