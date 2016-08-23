@@ -351,9 +351,9 @@ void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& M
 		wchar_t		szSavedPath[MAX_PATH];
 
 		GetCurrentDirectory(MAX_PATH, szSavedPath);
-		SetCurrentDirectory( it.second->szPath.c_str() );
-
-
+		if ( SetCurrentDirectory( it.second->szPath.c_str() ) == 0 )
+			throw std::runtime_error( std::string(it.second->szPath.begin(), it.second->szPath.end()) + " does not exist! Aborting.");
+	
 		// Iterate through a directory
 		WIN32_FIND_DATA		findData;
 		HANDLE				hFoundFiles = FindFirstFile(L"*.txt", &findData);
@@ -367,7 +367,7 @@ void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& M
 			FindClose(hFoundFiles);
 		}
 		else
-			throw it.second->szPath;
+			throw std::runtime_error( "Error reading files in " + std::string(it.second->szPath.begin(), it.second->szPath.end()) + "! Aborting.");
 
 		SetCurrentDirectory(szSavedPath);
 	}
@@ -678,6 +678,11 @@ int wmain(int argc, wchar_t* argv[])
 				ProduceMasterCache(LangName, MasterCacheMap);
 
 			ProduceStats(LogFile, LangName, TablesMap);
+		}
+		catch ( std::exception& e )
+		{
+			std::cerr << "ERROR: " << e.what();
+			return 1;
 		}
 		catch (...)
 		{

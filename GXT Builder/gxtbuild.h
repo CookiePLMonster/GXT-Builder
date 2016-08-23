@@ -13,6 +13,7 @@
 #include <ctime>
 #include "utf8.h"
 #include <memory>
+#include <exception>
 
 enum eGXTVersion
 {
