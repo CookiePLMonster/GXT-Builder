@@ -579,13 +579,26 @@ const wchar_t* GetFormatName( eGXTVersion version )
 	return L"Unsupported";
 }
 
+static const char* helpText = "Usage:\tgxtbuilder.exe path\\to\\ini.ini [-vc] [-sa] [additional langs...]\n"
+					"\t-vc - build GXT in Vice City format\n\t-sa - build GXT in San Andreas format\n"
+					"\tadditional langs... - ADVANCED USAGE ONLY - names of other language INI files you want to notify "
+					"about the changes\n\t\tfor each file from the list appends information about changed/added GXT entries "
+					"to [langname]_changes.txt\n\n\tgxtbuilder.exe --help - displays this help message\n\n"
+					"Please refer to doc\\american.ini for an example of input INI file\n";
+
 int wmain(int argc, wchar_t* argv[])
 {
 	std::ios_base::sync_with_stdio(false);
 	std::wcout << L"GXT Builder v1.2\nMade by Silent\n";
 	if ( argc >= 2 )
 	{
-				// A map of GXT tables
+		if ( std::wstring( argv[1] ) == L"--help" )
+		{
+			std::cout << helpText;
+			return 0;
+		}
+
+		// A map of GXT tables
 		wchar_t								wcCharacterMap[CHARACTER_MAP_SIZE];
 		tableMap_t							TablesMap(compTable);
 		std::map<uint32_t,VersionControlMap>	MasterCacheMap;
@@ -691,7 +704,10 @@ int wmain(int argc, wchar_t* argv[])
 		}
 	}
 	else
-		std::wcerr << L"Input file not specified!\n";
+	{
+		std::cout << helpText;
+		return 0;
+	}
 
 	return 0;
 }
