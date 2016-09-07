@@ -522,7 +522,7 @@ void ReadMasterTable(const std::wstring& szMasterLangName, std::map<uint32_t,Ver
 		{
 			std::pair<uint32_t, VersionControlMap>	OneEntry;
 			OneEntry.second.bLinked = false;
-			CacheFile.read(reinterpret_cast<char*>(&OneEntry), 8);
+			CacheFile.read(reinterpret_cast<char*>(&OneEntry), sizeof(OneEntry));
 			if ( CacheFile.eof() )
 				break;
 			MasterMap.insert(OneEntry);
@@ -535,6 +535,7 @@ void ProduceMasterCache(const std::wstring& szMasterLangName, std::map<uint32_t,
 	std::string								szNarrowLangName(szMasterLangName.begin(), szMasterLangName.end());
 	wchar_t								wcHashText[MAX_PATH];
 
+	CreateDirectory( L"cache", nullptr );
 	swprintf(wcHashText, MAX_PATH, L"cache\\%X", crc32FromString(szNarrowLangName.c_str()));
 
 	std::ofstream	CacheFile(wcHashText, std::ofstream::binary);
@@ -672,7 +673,7 @@ int wmain(int argc, wchar_t* argv[])
 
 			try
 			{
-				ReadTextFiles(TablesMap, MasterCacheMap, SlaveStreamsList, LogFile, argc > 2);
+				ReadTextFiles(TablesMap, MasterCacheMap, SlaveStreamsList, LogFile, argc > firstStream);
 				ApplyCharacterMap(TablesMap, wcCharacterMap);
 			}
 			catch (uint32_t cChar)
@@ -687,7 +688,7 @@ int wmain(int argc, wchar_t* argv[])
 			}
 
 			ProduceGXTFile( LangName, TablesMap, fileVersion );
-			if ( argc > 2 )
+			if ( argc > firstStream )
 				ProduceMasterCache(LangName, MasterCacheMap);
 
 			ProduceStats(LogFile, LangName, TablesMap);
