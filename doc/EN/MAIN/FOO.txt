@@ -1,0 +1,3 @@
+# Lines preceeded with # are ignored
+# Entry name and text MUST be separated with a single tabulator (\t)!!!
+MYTEXT	The quick brown fox jumps over the lazy dog

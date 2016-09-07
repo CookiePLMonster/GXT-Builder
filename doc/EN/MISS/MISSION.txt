@@ -1,0 +1,6 @@
+# Lines preceeded with # are ignored
+# Entry name and text MUST be separated with a single tabulator (\t)!!!
+TEST1	~g~My mission text.
+TEST2	Another mission text!
+
+TESTA	ANOTHER!
