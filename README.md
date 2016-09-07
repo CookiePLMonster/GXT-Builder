@@ -9,7 +9,7 @@ Visual Studio 2015 is recommended, though Visual Studio 2013 should work just fi
 
 ## Using
 
-    gxtbuilder.exe path\\to\\ini.ini [-vc] [-sa] [additional langs...]
+    gxtbuilder path\\to\\ini.ini [-vc] [-sa] [additional langs...]
 
 The tool requires a specific INI file formatting. Please look up `doc\american.ini` for a documentation of the used INI format.
 
