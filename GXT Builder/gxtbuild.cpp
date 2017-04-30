@@ -92,7 +92,7 @@ namespace VC
 {
 	bool GXTTable::InsertEntry( const std::string& entryName, uint32_t offset )
 	{
-		return Entries.insert( std::make_pair( entryName, static_cast<uint32_t>(offset * sizeof(character_t)) ) ).second != false;
+		return Entries.emplace( entryName, static_cast<uint32_t>(offset * sizeof(character_t)) ).second != false;
 	}
 
 	void GXTTable::WriteOutEntries( std::ostream& stream )
@@ -125,7 +125,7 @@ namespace SA
 	bool GXTTable::InsertEntry( const std::string& entryName, uint32_t offset )
 	{
 		uint32_t entryHash = crc32FromUpcaseString( entryName.c_str() );
-		return Entries.insert( std::make_pair( entryHash, static_cast<uint32_t>(offset * sizeof(character_t)) ) ).second != false;
+		return Entries.emplace( entryHash, static_cast<uint32_t>(offset * sizeof(character_t)) ).second != false;
 	}
 
 	void GXTTable::WriteOutEntries( std::ostream& stream )
@@ -206,10 +206,10 @@ void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 		throw szFileName;
 }
 
-void ParseINI( const std::wstring& szName, tableMap_t& TableMap, wchar_t* pCharacterMap, eGXTVersion fileVersion )
+void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharacterMap, eGXTVersion fileVersion )
 {
 	const size_t SCRATCH_PAD_SIZE = 32767;
-	std::wstring strFileName = szName + L".ini";
+	strFileName += L".ini";
 	std::unique_ptr< wchar_t[] > scratch( new wchar_t[ SCRATCH_PAD_SIZE ] );
 
 	// Add .\ if path is relative
@@ -260,7 +260,7 @@ void ParseINI( const std::wstring& szName, tableMap_t& TableMap, wchar_t* pChara
 			break;
 		}
 
-		TableMap.insert( make_pair( PathFindFileName( strTempFile.c_str() ), move(Table)) );
+		TableMap.emplace( PathFindFileName( strTempFile.c_str() ), move(Table) );
 	}
 }
 
@@ -303,7 +303,7 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, 
 						{
 							// New entry, add it!
 							VersionControlMap		VersionCtrlEntry(nTextHash);
-							MasterMap.insert(std::make_pair(nEntryHash, VersionCtrlEntry));
+							MasterMap.emplace(nEntryHash, VersionCtrlEntry);
 
 							// Notify about it in slave lang changes file
 							for ( const auto& it : SlaveStreams )
@@ -580,7 +580,7 @@ const wchar_t* GetFormatName( eGXTVersion version )
 	return L"Unsupported";
 }
 
-static const char* helpText = "Usage:\tgxtbuilder.exe path\\to\\ini.ini [-vc] [-sa] [additional langs...]\n"
+static const char* const helpText = "Usage:\tgxtbuilder.exe path\\to\\ini.ini [-vc] [-sa] [additional langs...]\n"
 					"\t-vc - build GXT in Vice City format\n\t-sa - build GXT in San Andreas format\n"
 					"\tadditional langs... - ADVANCED USAGE ONLY - names of other language INI files you want to notify "
 					"about the changes\n\t\tfor each file from the list appends information about changed/added GXT entries "

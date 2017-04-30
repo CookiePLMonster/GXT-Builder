@@ -28,8 +28,8 @@ public:
 	std::wstring			szPath;
 	std::string				Content;
 
-	GXTTableBase(const std::wstring& szFilePath)
-		: szPath(szFilePath)
+	GXTTableBase(std::wstring szFilePath)
+		: szPath(std::move(szFilePath))
 	{}
 
 	virtual ~GXTTableBase()
@@ -77,8 +77,8 @@ namespace VC
 	class GXTTable : public GXTTableBase
 	{
 	public:
-		GXTTable( const std::wstring& szFilePath )
-			: GXTTableBase( szFilePath )
+		GXTTable( std::wstring szFilePath )
+			: GXTTableBase( std::move(szFilePath) )
 		{}
 
 		virtual size_t	GetNumEntries() override
@@ -115,8 +115,8 @@ namespace SA
 	class GXTTable : public GXTTableBase
 	{
 	public:
-		GXTTable( const std:: wstring& szFilePath )
-			: GXTTableBase( szFilePath )
+		GXTTable( std:: wstring szFilePath )
+			: GXTTableBase( std::move(szFilePath) )
 		{}
 
 		virtual size_t	GetNumEntries() override
