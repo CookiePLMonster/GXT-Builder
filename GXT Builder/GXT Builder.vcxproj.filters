@@ -21,6 +21,9 @@
     <ClInclude Include="gxtbuild.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DelimStringReader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gxtbuild.cpp">

@@ -1,6 +1,8 @@
 #include "gxtbuild.h"
 
 #include "utf8.h"
+#include "DelimStringReader.h"
+
 #include <fstream>
 #include <iostream>
 #include <forward_list>
@@ -217,8 +219,9 @@ void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharacterMap, eGXTVersion fileVersion )
 {
 	const size_t SCRATCH_PAD_SIZE = 32767;
+	WideDelimStringReader reader( SCRATCH_PAD_SIZE );
+
 	strFileName += L".ini";
-	std::unique_ptr< wchar_t[] > scratch( new wchar_t[ SCRATCH_PAD_SIZE ] );
 
 	// Add .\ if path is relative
 	if ( PathIsRelative( strFileName.c_str() ) != FALSE )
@@ -227,48 +230,45 @@ void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharact
 	}
 
 	// Get attributes
-	GetPrivateProfileString( L"Attribs", L"version", nullptr, scratch.get(), SCRATCH_PAD_SIZE, strFileName.c_str() );
-	if ( scratch[0] != '\0' )
 	{
-		std::wstring strVersion = scratch.get();
-		for ( auto& ch : strVersion )
-			ch = towlower( ch );
-
-		if ( strVersion == L"vc" )
-			fileVersion = GXT_VC;
-		else if ( strVersion == L"sa" )
-			fileVersion = GXT_SA;
+		GetPrivateProfileString( L"Attribs", L"version", nullptr, reader.GetBuffer(), static_cast<DWORD>(reader.GetSize()), strFileName.c_str() );
+		wchar_t* buf = reader.GetBuffer();
+		if ( buf[0] != '\0' )
+		{
+			if ( _wcsicmp( buf, L"vc" ) )
+				fileVersion = GXT_VC;
+			else if ( _wcsicmp( buf, L"sa" ) )
+				fileVersion = GXT_SA;
+		}
 	}
 
-	GetPrivateProfileString( L"Attribs", L"charmap", nullptr, scratch.get(), SCRATCH_PAD_SIZE, strFileName.c_str() );
-	ParseCharacterMap( scratch.get(), pCharacterMap );
-
-	// Read all files list
-	GetPrivateProfileSection( L"Tables", scratch.get(), SCRATCH_PAD_SIZE, strFileName.c_str() );
-
-	for( wchar_t* raw = scratch.get(); *raw != '\0'; ++raw )
 	{
-		// Construct a std::wstring with the line
-		std::wstring strTempFile;
-		do
-		{
-			strTempFile.push_back( *raw );
-			raw++;
-		}
-		while ( *raw != '\0' );
+		reader.Reset();
+		GetPrivateProfileString( L"Attribs", L"charmap", nullptr, reader.GetBuffer(), static_cast<DWORD>(reader.GetSize()), strFileName.c_str() );
+		ParseCharacterMap( reader.GetBuffer(), pCharacterMap );
+	}
 
-		std::unique_ptr<GXTTableBase>	Table;
-		switch ( fileVersion )
-		{
-		case GXT_VC:
-			Table = std::make_unique<VC::GXTTable>( strTempFile ); 
-			break;
-		case GXT_SA:
-			Table = std::make_unique<SA::GXTTable>( strTempFile ); 
-			break;
-		}
+	{
+		// Read all files list
+		reader.Reset();
+		GetPrivateProfileSection( L"Tables", reader.GetBuffer(), static_cast<DWORD>(reader.GetSize()), strFileName.c_str() );
 
-		TableMap.emplace( PathFindFileName( strTempFile.c_str() ), move(Table) );
+		while ( const wchar_t* line = reader.GetString() )
+		{
+
+			std::unique_ptr<GXTTableBase>	Table;
+			switch ( fileVersion )
+			{
+			case GXT_VC:
+				Table = std::make_unique<VC::GXTTable>( line ); 
+				break;
+			case GXT_SA:
+				Table = std::make_unique<SA::GXTTable>( line ); 
+				break;
+			}
+
+			TableMap.emplace( PathFindFileName( line ), std::move(Table) );
+		}
 	}
 }
 
