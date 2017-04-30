@@ -92,7 +92,9 @@ uint32_t crc32Continue(uint32_t hash, const char* Str)
   return hash;
 }
 
-static const size_t CHARACTER_MAP_SIZE = 224;
+static const size_t CHARACTER_MAP_WIDTH = 16;
+static const size_t CHARACTER_MAP_HEIGHT = 14;
+static const size_t CHARACTER_MAP_SIZE = CHARACTER_MAP_WIDTH * CHARACTER_MAP_HEIGHT;
 
 
 namespace VC
@@ -187,7 +189,7 @@ void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 
 	if ( CharMapFile.is_open() && MakeSureFileIsValid(CharMapFile) )
 	{
-		for ( size_t i = 0; i < 14; ++i )
+		for ( size_t i = 0; i < CHARACTER_MAP_HEIGHT; ++i )
 		{
 			std::string					FileLine;
 
@@ -195,12 +197,12 @@ void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 
 			utf8::iterator<std::string::iterator> utf8It(FileLine.begin(), FileLine.begin(), FileLine.end());
 
-			for ( size_t j = 0; j < 16; ++j )
+			for ( size_t j = 0; j < CHARACTER_MAP_WIDTH; ++j )
 			{
-				pCharacterMap[i*16+j] = static_cast<wchar_t>(*utf8It);
+				pCharacterMap[(i*CHARACTER_MAP_WIDTH)+j] = static_cast<wchar_t>(*utf8It);
 
 				// Skip the tabulation too
-				if ( j < 15 )
+				if ( j < (CHARACTER_MAP_WIDTH-1) )
 				{
 					utf8It++;
 					utf8It++;
