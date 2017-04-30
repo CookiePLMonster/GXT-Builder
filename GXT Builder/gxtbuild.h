@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <strsafe.h>
 
 enum eGXTVersion
 {
@@ -37,18 +38,20 @@ public:
 
 struct EntryName
 {
-	char						cName[8];
+	static const size_t		GXT_TABLE_NAME_LEN = 8;
+
+	char						cName[GXT_TABLE_NAME_LEN];
 
 	EntryName(const char* pName)
 	{
-		memset(cName, 0, sizeof(cName));
-		strncpy( cName, pName, _countof(cName) );
+		StringCchCopyNExA( cName, _countof(cName), pName, GXT_TABLE_NAME_LEN, nullptr, nullptr, STRSAFE_FILL_BEHIND_NULL );
 	}
 
 	EntryName(const wchar_t* pName)
 	{
-		memset(cName, 0, sizeof(cName));
-		wcstombs( cName, pName, _countof(cName) );
+		size_t numConverted = 0;
+		wcstombs_s( &numConverted, cName, pName, _countof(cName) );
+		std::fill( std::begin(cName)+numConverted, std::end(cName), 0 ); 
 	}
 };
 

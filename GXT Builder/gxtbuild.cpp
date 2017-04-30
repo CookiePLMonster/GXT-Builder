@@ -108,8 +108,7 @@ namespace VC
 		{
 			// Pad string to 8 bytes
 			char buf[GXT_ENTRY_NAME_LEN];
-			memset( buf, 0, sizeof(buf) );
-			strncpy( buf, it.first.c_str(), GXT_ENTRY_NAME_LEN );
+			StringCchCopyNExA( buf, _countof(buf), it.first.c_str(), GXT_ENTRY_NAME_LEN, nullptr, nullptr, STRSAFE_FILL_BEHIND_NULL );
 
 			stream.write(reinterpret_cast<const char*>(&it.second), sizeof( it.second ) );
 			stream.write( buf, GXT_ENTRY_NAME_LEN );
@@ -158,13 +157,13 @@ namespace SA
 
 static bool compTable(const EntryName& lhs, const EntryName& rhs)
 {
-	if ( strncmp(lhs.cName, "MAIN", _countof(lhs.cName)) == 0 )
+	if ( strncmp(lhs.cName, "MAIN", EntryName::GXT_TABLE_NAME_LEN) == 0 )
 		return true;
 
-	if ( strncmp(rhs.cName, "MAIN", _countof(rhs.cName)) == 0 )
+	if ( strncmp(rhs.cName, "MAIN", EntryName::GXT_TABLE_NAME_LEN) == 0 )
 		return false;
 
-	return strncmp(lhs.cName, rhs.cName, 8) < 0;
+	return strncmp(lhs.cName, rhs.cName, EntryName::GXT_TABLE_NAME_LEN) < 0;
 }
 
 static bool MakeSureFileIsValid(std::ifstream& file)
@@ -498,10 +497,14 @@ void ProduceStats(std::ofstream& LogFile, const std::wstring& szLangName, const 
 	{
 		time_t			currentTime;
 		size_t			numEntries = 0;
+		
+		const size_t	BUF_SIZE = 30;
+		char			timeBuf[BUF_SIZE];
 
 		time(&currentTime);
+		ctime_s( timeBuf, BUF_SIZE, &currentTime );
 
-		LogFile << "\nBuilding finished at " << ctime(&currentTime) << "GXT contains " << TablesMap.size() << " tables:\n";
+		LogFile << "\nBuilding finished at " << timeBuf << "GXT contains " << TablesMap.size() << " tables:\n";
 
 		for ( const auto& it : TablesMap )
 		{
@@ -642,9 +645,13 @@ int wmain(int argc, wchar_t* argv[])
 		LogFile.open(LangName + L"_build.log");
 
 		time_t			currentTime;
+		const size_t	BUF_SIZE = 30;
+		char			timeBuf[BUF_SIZE];
 
 		time(&currentTime);
-		LogFile << std::string(LangName.begin(), LangName.end()) << ".gxt building started at " << ctime(&currentTime);
+		ctime_s( timeBuf, BUF_SIZE, &currentTime );
+
+		LogFile << std::string(LangName.begin(), LangName.end()) << ".gxt building started at " << timeBuf;
 
 		try
 		{
