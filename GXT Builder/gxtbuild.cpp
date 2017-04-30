@@ -1,5 +1,12 @@
 #include "gxtbuild.h"
 
+#include "utf8.h"
+#include <fstream>
+#include <iostream>
+#include <forward_list>
+#include <Shlwapi.h>
+#include <ctime>
+
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 

@@ -1,19 +1,9 @@
 #ifndef __GXTBUILD_H
 #define __GXTBUILD_H
 
-#define _CRT_SECURE_NO_WARNINGS
-#include <cstdint>
-#include <cctype>
 #include <string>
-#include <fstream>
-#include <iostream>
 #include <map>
-#include <forward_list>
-#include <shlwapi.h>
-#include <ctime>
-#include "utf8.h"
 #include <memory>
-#include <exception>
 
 enum eGXTVersion
 {
