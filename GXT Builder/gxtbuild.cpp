@@ -8,6 +8,7 @@
 #include <forward_list>
 #include <Shlwapi.h>
 #include <ctime>
+#include <sstream>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -162,6 +163,38 @@ namespace SA
 	}
 };
 
+class ScopedCurrentDirectory
+{
+public:
+	ScopedCurrentDirectory( )
+	{
+		GetCurrentDirectory( _countof(m_currentDir), m_currentDir );
+	}
+
+	ScopedCurrentDirectory( const wchar_t* newDirectory )
+	{
+		GetCurrentDirectory( _countof(m_currentDir), m_currentDir );
+		Set( newDirectory );
+	}
+
+	~ScopedCurrentDirectory()
+	{
+		SetCurrentDirectory( m_currentDir );
+	}
+
+	void Set( const wchar_t* newDirectory ) const
+	{
+		if ( SetCurrentDirectory( newDirectory ) == 0 )
+		{
+			std::wstring tmp(newDirectory);
+			throw std::runtime_error( std::string(tmp.begin(), tmp.end()) + " does not exist! Aborting.");
+		}
+	}
+
+private:
+	wchar_t m_currentDir[MAX_PATH];
+};
+
 
 static bool compTable(const EntryName& lhs, const EntryName& rhs)
 {
@@ -217,7 +250,7 @@ void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 		}
 	}
 	else
-		throw szFileName;
+		throw std::runtime_error( "Cannot parse character map file " + std::string(szFileName.begin(), szFileName.end()) + "!" );
 }
 
 void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharacterMap, eGXTVersion fileVersion )
@@ -249,6 +282,9 @@ void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharact
 	{
 		reader.Reset();
 		GetPrivateProfileString( L"Attribs", L"charmap", nullptr, reader.GetBuffer(), static_cast<DWORD>(reader.GetSize()), strFileName.c_str() );
+		if ( reader.GetBuffer() [0] == '\0' )
+			throw std::runtime_error( "charmap entry not specified in " + std::string(strFileName.begin(), strFileName.end()) + "!");
+
 		ParseCharacterMap( reader.GetBuffer(), pCharacterMap );
 	}
 
@@ -352,7 +388,10 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, 
 		}
 	}
 	else
-		throw pFileName;
+	{
+		std::wstring tmp(pFileName);
+		throw std::runtime_error( std::string(tmp.begin(), tmp.end()) + " not found!");
+	}
 }
 
 void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& MasterMap, const std::forward_list<std::ofstream*>& SlaveStreams, std::ofstream& LogFile, bool bMasterBuilding)
@@ -360,11 +399,7 @@ void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& M
 	for ( auto& it : TableMap )
 	{
 		// Prepare a path
-		wchar_t		szSavedPath[MAX_PATH];
-
-		GetCurrentDirectory(MAX_PATH, szSavedPath);
-		if ( SetCurrentDirectory( it.second->szPath.c_str() ) == 0 )
-			throw std::runtime_error( std::string(it.second->szPath.begin(), it.second->szPath.end()) + " does not exist! Aborting.");
+		ScopedCurrentDirectory currentDir( it.second->szPath.c_str() );	
 	
 		// Iterate through a directory
 		WIN32_FIND_DATA		findData;
@@ -380,8 +415,6 @@ void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& M
 		}
 		else
 			throw std::runtime_error( "Error reading files in " + std::string(it.second->szPath.begin(), it.second->szPath.end()) + "! Aborting.");
-
-		SetCurrentDirectory(szSavedPath);
 	}
 
 }
@@ -413,7 +446,11 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const wchar_t* pCharacterMap)
 			}
 
 			if ( !bFound )
-				throw *strIt;
+			{
+				std::ostringstream tmpstream;
+				tmpstream << "Can't locate character \"" << static_cast<wchar_t>(*strIt) << "\" (" << *strIt << ") in a character map!";
+				throw std::runtime_error( tmpstream.str() );
+			}
 		}
 
 	}
@@ -494,7 +531,9 @@ void ProduceGXTFile( const std::wstring& szLangName, const tableMap_t& TablesMap
 		std::wcout << L"Finished building " << szLangName << L".gxt!\n";
 	}
 	else
-		throw szLangName;
+	{
+		throw std::runtime_error( "Can't create " + std::string(szLangName.begin(), szLangName.end()) + ".gxt!");
+	}
 }
 
 void ProduceStats(std::ofstream& LogFile, const std::wstring& szLangName, const tableMap_t& TablesMap)
@@ -612,34 +651,6 @@ static const char* const helpText = "Usage:\tgxtbuilder.exe path\\to\\ini.ini [-
 					"to [langname]_changes.txt\n\n\tgxtbuilder.exe --help - displays this help message\n\n"
 					"Please refer to doc\\american.ini for an example of input INI file\n";
 
-class ScopedCurrentDirectory
-{
-public:
-	ScopedCurrentDirectory( )
-	{
-		GetCurrentDirectory( _countof(m_currentDir), m_currentDir );
-	}
-
-	ScopedCurrentDirectory( const wchar_t* newDirectory )
-	{
-		GetCurrentDirectory( _countof(m_currentDir), m_currentDir );
-		SetCurrentDirectory( newDirectory );
-	}
-
-	~ScopedCurrentDirectory()
-	{
-		SetCurrentDirectory( m_currentDir );
-	}
-
-	void Set( const wchar_t* newDirectory )
-	{
-		SetCurrentDirectory( newDirectory );
-	}
-
-private:
-	wchar_t m_currentDir[MAX_PATH];
-};
-
 int wmain(int argc, wchar_t* argv[])
 {
 	std::ios_base::sync_with_stdio(false);
@@ -736,22 +747,8 @@ int wmain(int argc, wchar_t* argv[])
 			}
 
 
-			try
-			{
-				ReadTextFiles(TablesMap, MasterCacheMap, SlaveStreamsList, LogFile, argc > firstStream);
-				ApplyCharacterMap(TablesMap, wcCharacterMap);
-			}
-			catch (uint32_t cChar)
-			{
-				std::wcerr << L"Error: Can't locate character \"" << static_cast<wchar_t>(cChar) << "\" (" << cChar << L") in a character map!\n";
-				return -1;
-			}
-			catch (const wchar_t* pDir)
-			{
-				std::wcerr << L"Error: Directory " << pDir << L" not found or empty!\n";
-				return -1;
-			}
-
+			ReadTextFiles(TablesMap, MasterCacheMap, SlaveStreamsList, LogFile, argc > firstStream);
+			ApplyCharacterMap(TablesMap, wcCharacterMap);
 			ProduceGXTFile( LangName, TablesMap, fileVersion );
 			if ( argc > firstStream )
 				ProduceMasterCache(LangName, MasterCacheMap);
@@ -761,11 +758,6 @@ int wmain(int argc, wchar_t* argv[])
 		catch ( std::exception& e )
 		{
 			std::cerr << "ERROR: " << e.what();
-			return 1;
-		}
-		catch (...)
-		{
-			std::wcerr << L"Unknown error occured!\n";
 			return 1;
 		}
 	}
