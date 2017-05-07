@@ -12,6 +12,10 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#ifndef UNICODE
+#error GXT Builder must be compiled with Unicode character set
+#endif
+
 static const uint32_t crc32table[256] =
 {
     0x00000000UL, 0x77073096UL, 0xee0e612cUL, 0x990951baUL, 0x076dc419UL,
@@ -592,12 +596,49 @@ const wchar_t* GetFormatName( eGXTVersion version )
 	return L"Unsupported";
 }
 
+std::wstring MakeIniPath(const std::wstring& strFullIniPath)
+{
+	std::wstring::size_type	slashPos = strFullIniPath.find_last_of(L"/\\");
+	if ( slashPos == std::wstring::npos )
+		return L"";
+
+	return strFullIniPath.substr(0, slashPos);
+}
+
 static const char* const helpText = "Usage:\tgxtbuilder.exe path\\to\\ini.ini [-vc] [-sa] [additional langs...]\n"
 					"\t-vc - build GXT in Vice City format\n\t-sa - build GXT in San Andreas format\n"
 					"\tadditional langs... - ADVANCED USAGE ONLY - names of other language INI files you want to notify "
 					"about the changes\n\t\tfor each file from the list appends information about changed/added GXT entries "
 					"to [langname]_changes.txt\n\n\tgxtbuilder.exe --help - displays this help message\n\n"
 					"Please refer to doc\\american.ini for an example of input INI file\n";
+
+class ScopedCurrentDirectory
+{
+public:
+	ScopedCurrentDirectory( )
+	{
+		GetCurrentDirectory( _countof(m_currentDir), m_currentDir );
+	}
+
+	ScopedCurrentDirectory( const wchar_t* newDirectory )
+	{
+		GetCurrentDirectory( _countof(m_currentDir), m_currentDir );
+		SetCurrentDirectory( newDirectory );
+	}
+
+	~ScopedCurrentDirectory()
+	{
+		SetCurrentDirectory( m_currentDir );
+	}
+
+	void Set( const wchar_t* newDirectory )
+	{
+		SetCurrentDirectory( newDirectory );
+	}
+
+private:
+	wchar_t m_currentDir[MAX_PATH];
+};
 
 int wmain(int argc, wchar_t* argv[])
 {
@@ -638,6 +679,9 @@ int wmain(int argc, wchar_t* argv[])
 				break;
 		}
 
+		std::wstring IniDirectory = MakeIniPath( LangName );
+		ScopedCurrentDirectory scopedDir;
+
 		// Retrieve language name
 		LangName = std::wstring(LangName.begin()+1+LangName.find_last_of('\\'), LangName.end()-4);
 
@@ -654,6 +698,11 @@ int wmain(int argc, wchar_t* argv[])
 		ctime_s( timeBuf, BUF_SIZE, &currentTime );
 
 		LogFile << std::string(LangName.begin(), LangName.end()) << ".gxt building started at " << timeBuf;
+
+		if ( !IniDirectory.empty() )
+		{
+			scopedDir.Set( IniDirectory.c_str() );
+		}
 
 		try
 		{
