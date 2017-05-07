@@ -312,7 +312,7 @@ void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharact
 	}
 }
 
-void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, std::map<uint32_t,VersionControlMap>& MasterMap, const std::forward_list<std::ofstream*>& SlaveStreams, std::ofstream& LogFile, bool bMasterBuilding)
+void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, std::map<uint32_t,VersionControlMap>& MasterMap, std::forward_list<std::ofstream>& SlaveStreams, std::ofstream& LogFile, bool bMasterBuilding)
 {
 	std::ifstream		InputFile(pFileName, std::ifstream::in);
 
@@ -354,9 +354,9 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, 
 							MasterMap.emplace(nEntryHash, VersionCtrlEntry);
 
 							// Notify about it in slave lang changes file
-							for ( const auto& it : SlaveStreams )
+							for ( auto& it : SlaveStreams )
 							{
-								(*it) << EntryName << " - ADDED to table " << TableIt.first.cName << std::endl;
+								it << EntryName << " - ADDED to table " << TableIt.first.cName << std::endl;
 							}
 						}
 						else
@@ -366,9 +366,9 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, 
 							{
 								// Modified entry!
 								// Notify about it in slave lang changes file
-								for ( const auto& it : SlaveStreams )
+								for ( auto& it : SlaveStreams )
 								{
-									(*it) << EntryName << " - MODIFIED in table " << TableIt.first.cName << std::endl;
+									it << EntryName << " - MODIFIED in table " << TableIt.first.cName << std::endl;
 								}
 
 								ThisEntryIt->second.TextHash = nTextHash;
@@ -394,7 +394,7 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, 
 	}
 }
 
-void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& MasterMap, const std::forward_list<std::ofstream*>& SlaveStreams, std::ofstream& LogFile, bool bMasterBuilding)
+void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& MasterMap, std::forward_list<std::ofstream>& SlaveStreams, std::ofstream& LogFile, bool bMasterBuilding)
 {
 	for ( auto& it : TableMap )
 	{
@@ -667,7 +667,7 @@ int wmain(int argc, wchar_t* argv[])
 		wchar_t								wcCharacterMap[CHARACTER_MAP_SIZE];
 		tableMap_t							TablesMap(compTable);
 		std::map<uint32_t,VersionControlMap>	MasterCacheMap;
-		std::forward_list<std::ofstream*>		SlaveStreamsList;
+		std::forward_list<std::ofstream>		SlaveStreamsList;
 		std::wstring							LangName(argv[1]);
 		std::ofstream							LogFile;
 
@@ -726,14 +726,14 @@ int wmain(int argc, wchar_t* argv[])
 					std::wstring			SlaveFileName = argv[i];
 					SlaveFileName += L"_changes.txt";
 
-					std::ofstream*		SlaveStream = new std::ofstream(SlaveFileName, std::ofstream::app);
-					if ( SlaveStream->is_open() )
+					std::ofstream		SlaveStream(SlaveFileName, std::ofstream::app);
+					if ( SlaveStream.is_open() )
 					{
-						SlaveStream->put('\n');
-						SlaveStreamsList.push_front(SlaveStream);
+						SlaveStream.put('\n');
+						SlaveStreamsList.push_front( std::move(SlaveStream) );
 					}
 				}
-				ReadMasterTable(/*TablesMap,*/ LangName, MasterCacheMap);
+				ReadMasterTable(LangName, MasterCacheMap);
 			}
 			else
 			{
