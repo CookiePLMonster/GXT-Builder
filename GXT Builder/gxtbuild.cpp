@@ -178,6 +178,9 @@ std::unique_ptr<GXTFileBase> GXTFileBase::InstantiateBuilder( eGXTVersion versio
 	case GXT_SA:
 		ptr = std::make_unique< SA::GXTFile<uint8_t> >();
 		break;
+	case GXT_SA_MOBILE:
+		ptr = std::make_unique< SA::GXTFile<uint16_t> >();
+		break;
 	default:
 		throw std::runtime_error( std::string("Trying to instantiate an unsupported GXT builder version " + version) + "!" );
 		break;
@@ -379,6 +382,8 @@ void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharact
 				fileVersion = GXT_VC;
 			else if ( _wcsicmp( buf, L"sa" ) )
 				fileVersion = GXT_SA;
+			else if ( _wcsicmp( buf, L"samobile" ) )
+				fileVersion = GXT_SA_MOBILE;
 		}
 	}
 
@@ -407,6 +412,9 @@ void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharact
 				break;
 			case GXT_SA:
 				Table = std::make_unique<SA::GXTTable<uint8_t> >( line ); 
+				break;
+			case GXT_SA_MOBILE:
+				Table = std::make_unique<SA::GXTTable<uint16_t> >( line );
 				break;
 			}
 
@@ -654,6 +662,8 @@ const wchar_t* GetFormatName( eGXTVersion version )
 		return L"GTA Vice City";
 	case GXT_SA:
 		return L"GTA San Andreas";
+	case GXT_SA_MOBILE:
+		return L"GTA San Andreas (Mobile version)";
 	}
 	return L"Unsupported";
 }
@@ -708,6 +718,8 @@ int wmain(int argc, wchar_t* argv[])
 					fileVersion = GXT_SA;
 				else if ( tmp == L"-vc" )
 					fileVersion = GXT_VC;
+				else if ( tmp == L"-samobile" )
+					fileVersion = GXT_SA_MOBILE;
 			}
 			else
 				break;
