@@ -163,6 +163,105 @@ namespace SA
 	}
 };
 
+std::unique_ptr<GXTFileBase> GXTFileBase::InstantiateBuilder( eGXTVersion version )
+{
+	std::unique_ptr<GXTFileBase> ptr;
+	switch ( version )
+	{
+	case GXT_VC:
+		ptr = std::make_unique< VC::GXTFile >();
+		break;
+	case GXT_SA:
+		ptr = std::make_unique< SA::GXTFile >();
+		break;
+	default:
+		throw std::runtime_error( std::string("Trying to instantiate an unsupported GXT builder version " + version) + "!" );
+		break;
+	
+	}
+	return ptr;
+}
+
+// NOTE: Some GXT editors seem to use a different structure (offset differences), but this structure
+// matches original San Andreas GXT structure more!
+void GXTFileBase::ProduceGXTFile( const std::wstring& szLangName, const tableMap_t& TablesMap )
+{
+	std::ofstream	OutputFile(szLangName + L".gxt", std::ofstream::binary);
+	if ( OutputFile.is_open() )
+	{
+		uint32_t		dwCurrentOffset = 0;
+
+		// Header
+		{
+			const uint32_t headerSize = WriteOutHeader( OutputFile );
+			dwCurrentOffset += headerSize;
+		}
+
+		// Write TABL section
+		{
+			const char		header[] = { 'T', 'A', 'B', 'L' };
+			OutputFile.write(header, sizeof(header));
+
+			const uint32_t	dwBlockSize = static_cast<uint32_t>(TablesMap.size() * 12);
+			OutputFile.write(reinterpret_cast<const char*>(&dwBlockSize), sizeof(dwBlockSize));
+
+			dwCurrentOffset += sizeof(header) + sizeof(dwBlockSize) + dwBlockSize;
+
+			bool			bItsNotMain = false;
+			for ( auto& it : TablesMap )
+			{
+				OutputFile.write(it.first.cName, sizeof(it.first.cName));
+				OutputFile.write(reinterpret_cast<const char*>(&dwCurrentOffset), sizeof(dwCurrentOffset));
+				dwCurrentOffset += static_cast<uint32_t>( 16 + (bItsNotMain * 8) + (it.second->GetNumEntries() * it.second->GetEntrySize()) + it.second->GetFormattedContentSize() );
+
+				// Align to 4 bytes
+				dwCurrentOffset = (dwCurrentOffset + 4 - 1) & ~(4 - 1);
+
+				bItsNotMain = true;
+			}
+		}
+
+		// Write TKEY and TDAT sections
+		bool			bItsNotMain = false;
+		for ( const auto& it : TablesMap )
+		{
+			if ( bItsNotMain )
+				OutputFile.write(it.first.cName, sizeof(it.first.cName));
+			else
+				bItsNotMain = true;
+
+			{
+				const char		header[] = { 'T', 'K', 'E', 'Y' };
+				OutputFile.write(header, sizeof(header));
+				const uint32_t	dwBlockSize = static_cast<uint32_t>(it.second->GetNumEntries() * it.second->GetEntrySize());
+				OutputFile.write(reinterpret_cast<const char*>(&dwBlockSize), sizeof(dwBlockSize));
+
+				// Write TKEY entries
+				it.second->WriteOutEntries( OutputFile );
+			}
+
+			{
+				const char		header[] = { 'T', 'D', 'A', 'T' };
+				OutputFile.write(header, sizeof(header));
+				const uint32_t	dwBlockSize = static_cast<uint32_t>(it.second->GetFormattedContentSize());
+				OutputFile.write(reinterpret_cast<const char*>(&dwBlockSize), sizeof(dwBlockSize));
+
+				it.second->WriteOutContent( OutputFile );
+			}
+
+			// Align to 4 bytes
+			if ( OutputFile.tellp() % 4 )
+				OutputFile.seekp(4 - (OutputFile.tellp() % 4), std::ios_base::cur);
+		}
+
+		std::wcout << L"Finished building " << szLangName << L".gxt!\n";
+	}
+	else
+	{
+		throw std::runtime_error( "Can't create " + std::string(szLangName.begin(), szLangName.end()) + ".gxt!");
+	}
+}
+
 class ScopedCurrentDirectory
 {
 public:
@@ -456,86 +555,6 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const wchar_t* pCharacterMap)
 	}
 }
 
-// NOTE: Some GXT editors seem to use a different structure (offset differences), but this structure
-// matches original San Andreas GXT structure more!
-void ProduceGXTFile( const std::wstring& szLangName, const tableMap_t& TablesMap, eGXTVersion fileVersion )
-{
-	std::ofstream	OutputFile(szLangName + L".gxt", std::ofstream::binary);
-	if ( OutputFile.is_open() )
-	{
-		// Header (SA only)
-		if ( fileVersion == GXT_SA )
-		{
-			const char		header[] = { 0x04, 0x00, 0x08, 0x00 };	// 0x080004
-			OutputFile.write(header, sizeof(header));
-		}
-
-		// Write TABL section
-		{
-			uint32_t		dwCurrentOffset = fileVersion == GXT_SA ? 12 : 8;
-			const char		header[] = { 'T', 'A', 'B', 'L' };
-			OutputFile.write(header, sizeof(header));
-
-			const uint32_t	dwBlockSize = static_cast<uint32_t>(TablesMap.size() * 12);
-			OutputFile.write(reinterpret_cast<const char*>(&dwBlockSize), sizeof(dwBlockSize));
-
-			dwCurrentOffset += dwBlockSize;
-
-			bool			bItsNotMain = false;
-			for ( auto& it : TablesMap )
-			{
-				OutputFile.write(it.first.cName, sizeof(it.first.cName));
-				OutputFile.write(reinterpret_cast<const char*>(&dwCurrentOffset), sizeof(dwCurrentOffset));
-				dwCurrentOffset += static_cast<uint32_t>( 16 + (bItsNotMain * 8) + (it.second->GetNumEntries() * it.second->GetEntrySize()) + it.second->GetFormattedContentSize() );
-
-				// Align to 4 bytes
-				dwCurrentOffset = (dwCurrentOffset + 4 - 1) & ~(4 - 1);
-
-				bItsNotMain = true;
-			}
-		}
-
-		// Write TKEY and TDAT sections
-		bool			bItsNotMain = false;
-		for ( const auto& it : TablesMap )
-		{
-			if ( bItsNotMain )
-				OutputFile.write(it.first.cName, sizeof(it.first.cName));
-			else
-				bItsNotMain = true;
-
-			{
-				const char		header[] = { 'T', 'K', 'E', 'Y' };
-				OutputFile.write(header, sizeof(header));
-				const uint32_t	dwBlockSize = static_cast<uint32_t>(it.second->GetNumEntries() * it.second->GetEntrySize());
-				OutputFile.write(reinterpret_cast<const char*>(&dwBlockSize), sizeof(dwBlockSize));
-
-				// Write TKEY entries
-				it.second->WriteOutEntries( OutputFile );
-			}
-
-			{
-				const char		header[] = { 'T', 'D', 'A', 'T' };
-				OutputFile.write(header, sizeof(header));
-				const uint32_t	dwBlockSize = static_cast<uint32_t>(it.second->GetFormattedContentSize());
-				OutputFile.write(reinterpret_cast<const char*>(&dwBlockSize), sizeof(dwBlockSize));
-
-				it.second->WriteOutContent( OutputFile );
-			}
-
-			// Align to 4 bytes
-			if ( OutputFile.tellp() % 4 )
-				OutputFile.seekp(4 - (OutputFile.tellp() % 4), std::ios_base::cur);
-		}
-
-		std::wcout << L"Finished building " << szLangName << L".gxt!\n";
-	}
-	else
-	{
-		throw std::runtime_error( "Can't create " + std::string(szLangName.begin(), szLangName.end()) + ".gxt!");
-	}
-}
-
 void ProduceStats(std::ofstream& LogFile, const std::wstring& szLangName, const tableMap_t& TablesMap)
 {
 	if ( LogFile.is_open() )
@@ -746,10 +765,11 @@ int wmain(int argc, wchar_t* argv[])
 				}
 			}
 
+			std::unique_ptr<GXTFileBase>	fileBuilder = GXTFileBase::InstantiateBuilder( fileVersion );
 
 			ReadTextFiles(TablesMap, MasterCacheMap, SlaveStreamsList, LogFile, argc > firstStream);
 			ApplyCharacterMap(TablesMap, wcCharacterMap);
-			ProduceGXTFile( LangName, TablesMap, fileVersion );
+			fileBuilder->ProduceGXTFile( LangName, TablesMap );
 			if ( argc > firstStream )
 				ProduceMasterCache(LangName, MasterCacheMap);
 

@@ -55,6 +55,19 @@ struct EntryName
 	}
 };
 
+typedef std::map<EntryName, std::unique_ptr<GXTTableBase>, bool(*)(const EntryName&,const EntryName&)>	tableMap_t;
+
+class GXTFileBase
+{
+public:
+	static std::unique_ptr<GXTFileBase> InstantiateBuilder( eGXTVersion version );
+
+	void ProduceGXTFile( const std::wstring& szLangName, const tableMap_t& TablesMap );
+
+private:
+	virtual uint32_t WriteOutHeader( std::ostream& stream ) const = 0;
+};
+
 struct VersionControlMap
 {
 	uint32_t					TextHash;
@@ -70,6 +83,8 @@ namespace VC
 	class GXTTable : public GXTTableBase
 	{
 	public:
+		typedef uint16_t character_t;
+
 		GXTTable( std::wstring szFilePath )
 			: GXTTableBase( std::move(szFilePath) )
 		{}
@@ -95,11 +110,20 @@ namespace VC
 		virtual void	PushFormattedChar( int character ) override;
 
 	private:
-		typedef uint16_t character_t;
 		static const size_t		GXT_ENTRY_NAME_LEN = 8;
 
 		std::map<std::string, uint32_t>	Entries;
 		std::basic_string<character_t>	FormattedContent;
+	};
+
+	class GXTFile : public GXTFileBase
+	{
+	private:
+		virtual uint32_t WriteOutHeader( std::ostream& ) const override
+		{
+			// No header
+			return 0;
+		}
 	};
 };
 
@@ -108,6 +132,8 @@ namespace SA
 	class GXTTable : public GXTTableBase
 	{
 	public:
+		typedef uint8_t character_t;
+
 		GXTTable( std:: wstring szFilePath )
 			: GXTTableBase( std::move(szFilePath) )
 		{}
@@ -133,13 +159,20 @@ namespace SA
 		virtual void	PushFormattedChar( int character ) override;
 
 	private:
-		typedef uint8_t character_t;
-
 		std::map<uint32_t, uint32_t>	Entries;
 		std::basic_string<character_t>	FormattedContent;
 	};
-};
 
-typedef std::map<EntryName, std::unique_ptr<GXTTableBase>, bool(*)(const EntryName&,const EntryName&)>	tableMap_t;
+	class GXTFile : public GXTFileBase
+	{
+	private:
+		virtual uint32_t WriteOutHeader( std::ostream& stream ) const override
+		{
+			const char		header[] = { 0x04, 0x00, sizeof(GXTTable::character_t) * 8, 0x00 };	// 0x080004
+			stream.write(header, sizeof(header));
+			return sizeof(header);
+		}
+	};
+};
 
 #endif
