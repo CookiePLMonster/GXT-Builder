@@ -137,13 +137,15 @@ namespace VC
 
 namespace SA
 {
-	bool GXTTable::InsertEntry( const std::string& entryName, uint32_t offset )
+	template<typename Character>
+	bool GXTTable<Character>::InsertEntry( const std::string& entryName, uint32_t offset )
 	{
 		uint32_t entryHash = crc32FromUpcaseString( entryName.c_str() );
 		return Entries.emplace( entryHash, static_cast<uint32_t>(offset * sizeof(character_t)) ).second != false;
 	}
 
-	void GXTTable::WriteOutEntries( std::ostream& stream )
+	template<typename Character>
+	void GXTTable<Character>::WriteOutEntries( std::ostream& stream )
 	{
 		for ( auto& it : Entries )
 		{
@@ -152,12 +154,14 @@ namespace SA
 		}
 	}
 
-	void GXTTable::WriteOutContent( std::ostream& stream )
+	template<typename Character>
+	void GXTTable<Character>::WriteOutContent( std::ostream& stream )
 	{
 		stream.write( reinterpret_cast<const char*>( FormattedContent.c_str() ), FormattedContent.size() * sizeof(character_t) );
 	}
 
-	void GXTTable::PushFormattedChar( int character )
+	template<typename Character>
+	void GXTTable<Character>::PushFormattedChar( int character )
 	{
 		FormattedContent.push_back( static_cast<character_t>( character ) );
 	}
@@ -172,7 +176,7 @@ std::unique_ptr<GXTFileBase> GXTFileBase::InstantiateBuilder( eGXTVersion versio
 		ptr = std::make_unique< VC::GXTFile >();
 		break;
 	case GXT_SA:
-		ptr = std::make_unique< SA::GXTFile >();
+		ptr = std::make_unique< SA::GXTFile<uint8_t> >();
 		break;
 	default:
 		throw std::runtime_error( std::string("Trying to instantiate an unsupported GXT builder version " + version) + "!" );
@@ -402,7 +406,7 @@ void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharact
 				Table = std::make_unique<VC::GXTTable>( line ); 
 				break;
 			case GXT_SA:
-				Table = std::make_unique<SA::GXTTable>( line ); 
+				Table = std::make_unique<SA::GXTTable<uint8_t> >( line ); 
 				break;
 			}
 
