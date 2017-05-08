@@ -599,7 +599,7 @@ void ReadMasterTable(const std::wstring& szMasterLangName, std::map<uint32_t,Ver
 	std::string							szNarrowLangName(szMasterLangName.begin(), szMasterLangName.end());
 	wchar_t								wcHashText[MAX_PATH];
 
-	swprintf(wcHashText, MAX_PATH, L"cache\\%X", crc32FromString(szNarrowLangName.c_str()));
+	swprintf_s(wcHashText, L"cache\\%X", crc32FromString(szNarrowLangName.c_str()));
 
 	std::ifstream	CacheFile(wcHashText, std::ifstream::binary);
 	if ( CacheFile.is_open() )
@@ -622,7 +622,7 @@ void ProduceMasterCache(const std::wstring& szMasterLangName, std::map<uint32_t,
 	wchar_t								wcHashText[MAX_PATH];
 
 	CreateDirectory( L"cache", nullptr );
-	swprintf(wcHashText, MAX_PATH, L"cache\\%X", crc32FromString(szNarrowLangName.c_str()));
+	swprintf_s(wcHashText, L"cache\\%X", crc32FromString(szNarrowLangName.c_str()));
 
 	std::ofstream	CacheFile(wcHashText, std::ofstream::binary);
 	if ( CacheFile.is_open() )
