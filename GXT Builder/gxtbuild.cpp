@@ -253,7 +253,7 @@ void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 		throw std::runtime_error( "Cannot parse character map file " + std::string(szFileName.begin(), szFileName.end()) + "!" );
 }
 
-void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharacterMap, eGXTVersion fileVersion )
+void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharacterMap, eGXTVersion& fileVersion )
 {
 	const size_t SCRATCH_PAD_SIZE = 32767;
 	WideDelimStringReader reader( SCRATCH_PAD_SIZE );
