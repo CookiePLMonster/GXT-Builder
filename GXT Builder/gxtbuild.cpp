@@ -13,6 +13,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#include "ScopedCurrentDirectory.h"
+
 #ifndef UNICODE
 #error GXT Builder must be compiled with Unicode character set
 #endif
@@ -268,38 +270,6 @@ void GXTFileBase::ProduceGXTFile( const std::wstring& szLangName, const tableMap
 		throw std::runtime_error( "Can't create " + std::string(szLangName.begin(), szLangName.end()) + ".gxt!");
 	}
 }
-
-class ScopedCurrentDirectory
-{
-public:
-	ScopedCurrentDirectory( )
-	{
-		GetCurrentDirectory( _countof(m_currentDir), m_currentDir );
-	}
-
-	ScopedCurrentDirectory( const wchar_t* newDirectory )
-	{
-		GetCurrentDirectory( _countof(m_currentDir), m_currentDir );
-		Set( newDirectory );
-	}
-
-	~ScopedCurrentDirectory()
-	{
-		SetCurrentDirectory( m_currentDir );
-	}
-
-	void Set( const wchar_t* newDirectory ) const
-	{
-		if ( SetCurrentDirectory( newDirectory ) == 0 )
-		{
-			std::wstring tmp(newDirectory);
-			throw std::runtime_error( std::string(tmp.begin(), tmp.end()) + " does not exist! Aborting.");
-		}
-	}
-
-private:
-	wchar_t m_currentDir[MAX_PATH];
-};
 
 
 static bool compTable(const EntryName& lhs, const EntryName& rhs)

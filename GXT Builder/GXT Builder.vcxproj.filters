@@ -24,6 +24,9 @@
     <ClInclude Include="DelimStringReader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ScopedCurrentDirectory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gxtbuild.cpp">

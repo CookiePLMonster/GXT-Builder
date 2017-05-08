@@ -156,6 +156,7 @@
   <ItemGroup>
     <ClInclude Include="DelimStringReader.h" />
     <ClInclude Include="gxtbuild.h" />
+    <ClInclude Include="ScopedCurrentDirectory.h" />
     <ClInclude Include="utf8.h" />
   </ItemGroup>
   <ItemGroup>
