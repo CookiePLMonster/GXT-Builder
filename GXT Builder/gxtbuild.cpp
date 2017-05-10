@@ -308,24 +308,23 @@ CharMapArray ParseCharacterMap(const std::wstring& szFileName)
 
 	if ( CharMapFile.is_open() && MakeSureFileIsValid(CharMapFile) )
 	{
+		CharMapArray::iterator charMapIterator = characterMap.begin();
+
 		for ( size_t i = 0; i < CHARACTER_MAP_HEIGHT; ++i )
 		{
-			std::string					FileLine;
-
+			std::string FileLine;
 			std::getline(CharMapFile, FileLine);
 
-			utf8::iterator<std::string::iterator> utf8It(FileLine.begin(), FileLine.begin(), FileLine.end());
-
+			size_t characterPos = 0;
 			for ( size_t j = 0; j < CHARACTER_MAP_WIDTH; ++j )
 			{
-				characterMap[(i*CHARACTER_MAP_WIDTH)+j] = static_cast<wchar_t>(*utf8It);
+				characterPos = FileLine.find_first_not_of( '\t', characterPos );
+				if ( characterPos == std::string::npos )
+					throw std::runtime_error( "Cannot parse character map file " + std::string(szFileName.begin(), szFileName.end()) + "!" );
 
-				// Skip the tabulation too
-				if ( j < (CHARACTER_MAP_WIDTH-1) )
-				{
-					utf8It++;
-					utf8It++;
-				}
+				utf8::iterator<std::string::iterator> utf8It(FileLine.begin()+characterPos, FileLine.begin(), FileLine.end());
+				*charMapIterator++ = static_cast<wchar_t>(*utf8It++);
+				characterPos = std::distance( FileLine.begin(), utf8It.base() );
 			}
 		}
 	}
