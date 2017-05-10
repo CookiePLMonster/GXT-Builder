@@ -9,6 +9,7 @@
 #include <Shlwapi.h>
 #include <ctime>
 #include <sstream>
+#include <array>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -104,6 +105,8 @@ uint32_t crc32Continue(uint32_t hash, const char* Str)
 static const size_t CHARACTER_MAP_WIDTH = 16;
 static const size_t CHARACTER_MAP_HEIGHT = 14;
 static const size_t CHARACTER_MAP_SIZE = CHARACTER_MAP_WIDTH * CHARACTER_MAP_HEIGHT;
+
+typedef std::array<wchar_t, CHARACTER_MAP_SIZE> CharMapArray;
 
 
 namespace VC
@@ -298,9 +301,10 @@ static bool MakeSureFileIsValid(std::ifstream& file)
 	return true;
 }
 
-void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
+CharMapArray ParseCharacterMap(const std::wstring& szFileName)
 {
 	std::ifstream		CharMapFile(szFileName, std::ifstream::in);
+	CharMapArray		characterMap;
 
 	if ( CharMapFile.is_open() && MakeSureFileIsValid(CharMapFile) )
 	{
@@ -314,7 +318,7 @@ void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 
 			for ( size_t j = 0; j < CHARACTER_MAP_WIDTH; ++j )
 			{
-				pCharacterMap[(i*CHARACTER_MAP_WIDTH)+j] = static_cast<wchar_t>(*utf8It);
+				characterMap[(i*CHARACTER_MAP_WIDTH)+j] = static_cast<wchar_t>(*utf8It);
 
 				// Skip the tabulation too
 				if ( j < (CHARACTER_MAP_WIDTH-1) )
@@ -327,9 +331,11 @@ void ParseCharacterMap(const std::wstring& szFileName, wchar_t* pCharacterMap)
 	}
 	else
 		throw std::runtime_error( "Cannot parse character map file " + std::string(szFileName.begin(), szFileName.end()) + "!" );
+
+	return characterMap;
 }
 
-void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharacterMap, eGXTVersion& fileVersion )
+void ParseINI( std::wstring strFileName, tableMap_t& TableMap, std::wstring& charMapName, eGXTVersion& fileVersion )
 {
 	const size_t SCRATCH_PAD_SIZE = 32767;
 	WideDelimStringReader reader( SCRATCH_PAD_SIZE );
@@ -363,7 +369,7 @@ void ParseINI( std::wstring strFileName, tableMap_t& TableMap, wchar_t* pCharact
 		if ( reader.GetBuffer() [0] == '\0' )
 			throw std::runtime_error( "charmap entry not specified in " + std::string(strFileName.begin(), strFileName.end()) + "!");
 
-		ParseCharacterMap( reader.GetBuffer(), pCharacterMap );
+		charMapName = reader.GetBuffer();
 	}
 
 	{
@@ -431,8 +437,7 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, 
 						if ( ThisEntryIt == MasterMap.end() )
 						{
 							// New entry, add it!
-							VersionControlMap		VersionCtrlEntry(nTextHash);
-							MasterMap.emplace(nEntryHash, VersionCtrlEntry);
+							MasterMap.emplace(nEntryHash, VersionControlMap(nTextHash));
 
 							// Notify about it in slave lang changes file
 							for ( auto& it : SlaveStreams )
@@ -502,7 +507,7 @@ void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& M
 
 #include <cassert>
 
-void ApplyCharacterMap(tableMap_t& TablesMap, const wchar_t* pCharacterMap)
+void ApplyCharacterMap(tableMap_t& TablesMap, const CharMapArray& characterMap)
 {
 	for ( auto& it : TablesMap )
 	{
@@ -518,7 +523,7 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const wchar_t* pCharacterMap)
 			}
 			for ( size_t i = 0; i < CHARACTER_MAP_SIZE; ++i )
 			{
-				if ( *strIt == pCharacterMap[i] )
+				if ( *strIt == characterMap[i] )
 				{
 					it.second->PushFormattedChar( static_cast<int>(i) + 32 );
 					bFound = true;
@@ -667,7 +672,6 @@ int wmain(int argc, wchar_t* argv[])
 		}
 
 		// A map of GXT tables
-		wchar_t								wcCharacterMap[CHARACTER_MAP_SIZE];
 		tableMap_t							TablesMap(compTable);
 		std::map<uint32_t,VersionControlMap>	MasterCacheMap;
 		std::forward_list<std::ofstream>		SlaveStreamsList;
@@ -722,7 +726,10 @@ int wmain(int argc, wchar_t* argv[])
 
 		try
 		{
-			ParseINI( LangName, TablesMap, wcCharacterMap, fileVersion );
+			std::wstring	charMapName;
+			ParseINI( LangName, TablesMap, charMapName, fileVersion );
+			const CharMapArray characterMap = ParseCharacterMap( charMapName );
+
 			if ( argc > firstStream )
 			{
 				// Open 'slave' streams
@@ -754,7 +761,7 @@ int wmain(int argc, wchar_t* argv[])
 			std::unique_ptr<GXTFileBase>	fileBuilder = GXTFileBase::InstantiateBuilder( fileVersion );
 
 			ReadTextFiles(TablesMap, MasterCacheMap, SlaveStreamsList, LogFile, argc > firstStream);
-			ApplyCharacterMap(TablesMap, wcCharacterMap);
+			ApplyCharacterMap(TablesMap, characterMap);
 			fileBuilder->ProduceGXTFile( LangName, TablesMap );
 			if ( argc > firstStream )
 				ProduceMasterCache(LangName, MasterCacheMap);
