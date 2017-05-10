@@ -354,11 +354,11 @@ void ParseINI( std::wstring strFileName, tableMap_t& TableMap, std::wstring& cha
 		wchar_t* buf = reader.GetBuffer();
 		if ( buf[0] != '\0' )
 		{
-			if ( _wcsicmp( buf, L"vc" ) )
+			if ( _wcsicmp( buf, L"vc" ) == 0 )
 				fileVersion = GXT_VC;
-			else if ( _wcsicmp( buf, L"sa" ) )
+			else if ( _wcsicmp( buf, L"sa" ) == 0 )
 				fileVersion = GXT_SA;
-			else if ( _wcsicmp( buf, L"samobile" ) )
+			else if ( _wcsicmp( buf, L"samobile" ) == 0 )
 				fileVersion = GXT_SA_MOBILE;
 		}
 	}
