@@ -505,15 +505,12 @@ void ReadTextFiles(tableMap_t& TableMap, std::map<uint32_t,VersionControlMap>& M
 
 }
 
-#include <cassert>
-
 void ApplyCharacterMap(tableMap_t& TablesMap, const CharMapArray& characterMap)
 {
 	for ( auto& it : TablesMap )
 	{
-		for ( auto strIt = utf8::iterator<std::string::iterator>(it.second->Content.begin(), it.second->Content.begin(), it.second->Content.end()),
-				endIt = utf8::iterator<std::string::iterator>(it.second->Content.end(), it.second->Content.begin(),  it.second->Content.end());
-				strIt != endIt; ++strIt )
+		for ( utf8::iterator<std::string::iterator> strIt( it.second->Content.begin(), it.second->Content.begin(), it.second->Content.end() );
+				strIt.base() != it.second->Content.end(); ++strIt )
 		{
 			bool	bFound = false;
 			if ( *strIt == '\0' )
