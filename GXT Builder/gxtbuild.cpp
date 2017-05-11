@@ -419,8 +419,11 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, 
 			if ( !FileLine.empty() && FileLine[0] != '#' )
 			{
 				// Extract entry name
-				std::string		EntryName(FileLine.begin(), FileLine.begin()+FileLine.find('\t'));
-				std::string		EntryContent(FileLine.begin()+FileLine.find('\t')+1, FileLine.end());
+				std::string::size_type tabPos = FileLine.find_first_of('\t');
+				if ( tabPos == std::string::npos ) continue;
+
+				std::string		EntryName( FileLine.begin(), FileLine.begin()+tabPos );
+				std::string		EntryContent( FileLine.begin()+FileLine.find_first_not_of('\t', tabPos), FileLine.end() );
 				uint32_t	nEntryHash = crc32FromUpcaseString(EntryName.c_str());
 
 				// Push entry into table map
@@ -642,11 +645,24 @@ const wchar_t* GetFormatName( eGXTVersion version )
 
 std::wstring MakeIniPath(const std::wstring& strFullIniPath)
 {
+	std::wstring result;
 	std::wstring::size_type	slashPos = strFullIniPath.find_last_of(L"/\\");
-	if ( slashPos == std::wstring::npos )
-		return L"";
+	if ( slashPos != std::wstring::npos )
+	{
+		result = strFullIniPath.substr(0, slashPos);
+	}
+	return result;
+}
 
-	return strFullIniPath.substr(0, slashPos);
+std::wstring GetFileNameNoExtension(std::wstring path)
+{
+	std::wstring::size_type namePos = path.find_last_of(L"/\\");
+	std::wstring::size_type extPos = path.find_last_of(L'.');
+	if ( namePos == std::wstring::npos )
+		path = path.substr( 0, extPos );
+	else
+		path = path.substr( namePos+1, extPos );
+	return path;
 }
 
 static const char* const helpText = "Usage:\tgxtbuilder.exe path\\to\\ini.ini [-vc] [-sa] [additional langs...]\n"
@@ -700,7 +716,7 @@ int wmain(int argc, wchar_t* argv[])
 		ScopedCurrentDirectory scopedDir;
 
 		// Retrieve language name
-		LangName = std::wstring(LangName.begin()+1+LangName.find_last_of('\\'), LangName.end()-4);
+		LangName = GetFileNameNoExtension( LangName );
 
 		std::wcout << L"Building a file from " << LangName << L".ini, please wait...\n";
 		std::wcout << L"Used format: " << GetFormatName( fileVersion ) << L"\n";
