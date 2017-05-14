@@ -10,6 +10,7 @@
 #include <ctime>
 #include <sstream>
 #include <array>
+#include <vector>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -665,6 +666,16 @@ std::wstring GetFileNameNoExtension(std::wstring path)
 	return path;
 }
 
+static std::vector<std::wstring> MakeStringArgv( wchar_t* argv[] )
+{
+	std::vector<std::wstring> result;
+	while ( *argv != nullptr )
+	{
+		result.emplace_back( *argv++ );
+	}
+	return result;
+}
+
 static const char* const helpText = "Usage:\tgxtbuilder.exe path\\to\\ini.ini [-vc] [-sa] [additional langs...]\n"
 					"\t-vc - build GXT in Vice City format\n\t-sa - build GXT in San Andreas format\n"
 					"\tadditional langs... - ADVANCED USAGE ONLY - names of other language INI files you want to notify "
@@ -676,9 +687,12 @@ int wmain(int argc, wchar_t* argv[])
 {
 	std::ios_base::sync_with_stdio(false);
 	std::wcout << L"GXT Builder v1.2\nMade by Silent\n";
+
+	const std::vector<std::wstring> argvStr = MakeStringArgv( argv );
+
 	if ( argc >= 2 )
 	{
-		if ( std::wstring( argv[1] ) == L"--help" )
+		if ( argvStr[1] == L"--help" )
 		{
 			std::cout << helpText;
 			return 0;
@@ -688,7 +702,7 @@ int wmain(int argc, wchar_t* argv[])
 		tableMap_t							TablesMap(compTable);
 		std::map<uint32_t,VersionControlMap>	MasterCacheMap;
 		std::forward_list<std::ofstream>		SlaveStreamsList;
-		std::wstring							LangName(argv[1]);
+		std::wstring							LangName( argvStr[1] );
 		std::ofstream							LogFile;
 
 		// Parse commandline arguments
@@ -697,9 +711,9 @@ int wmain(int argc, wchar_t* argv[])
 		int	firstStream = 2;
 		for ( int i = 2; i < argc; ++i )
 		{
-			if ( argv[i][0] == '-' )
+			if ( argvStr[i][0] == '-' )
 			{
-				std::wstring	tmp = argv[i];
+				const std::wstring&	tmp = argvStr[i];
 				firstStream++;
 				if ( tmp == L"-sa" )
 					fileVersion = GXT_SA;
@@ -748,7 +762,7 @@ int wmain(int argc, wchar_t* argv[])
 				// Open 'slave' streams
 				for ( int i = firstStream; i < argc; ++i )
 				{
-					std::wstring			SlaveFileName = argv[i];
+					std::wstring			SlaveFileName = argvStr[i];
 					SlaveFileName += L"_changes.txt";
 
 					std::ofstream		SlaveStream(SlaveFileName, std::ofstream::app);
