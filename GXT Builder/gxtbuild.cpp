@@ -106,7 +106,7 @@ static const size_t CHARACTER_MAP_WIDTH = 16;
 static const size_t CHARACTER_MAP_HEIGHT = 14;
 static const size_t CHARACTER_MAP_SIZE = CHARACTER_MAP_WIDTH * CHARACTER_MAP_HEIGHT;
 
-typedef std::array<wchar_t, CHARACTER_MAP_SIZE> CharMapArray;
+typedef std::array<uint32_t, CHARACTER_MAP_SIZE> CharMapArray;
 
 
 namespace VC
@@ -325,7 +325,7 @@ CharMapArray ParseCharacterMap(const std::wstring& szFileName)
 				if ( utf8It.base() == FileLine.end() )
 					throw std::runtime_error( "Cannot parse character map file " + std::string(szFileName.begin(), szFileName.end()) + "!" );
 				
-				*charMapIterator++ = static_cast<wchar_t>(*utf8It++);
+				*charMapIterator++ = *utf8It++;
 			}
 		}
 	}
