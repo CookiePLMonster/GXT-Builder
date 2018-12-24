@@ -245,28 +245,28 @@ void GXTFileBase::ProduceGXTFile( const std::wstring& szLangName, const tableMap
 
 			dwCurrentOffset += sizeof(header) + sizeof(dwBlockSize) + dwBlockSize;
 
-			bool			bItsNotMain = false;
+			uint32_t sizeOfHeaders = 16; // TKEY + size of TKEY + TDAT + size of TDAT + (8b table name for non-MAIN)
 			for ( auto& it : TablesMap )
 			{
 				OutputFile.write(it.first.cName, sizeof(it.first.cName));
 				OutputFile.write(reinterpret_cast<const char*>(&dwCurrentOffset), sizeof(dwCurrentOffset));
-				dwCurrentOffset += static_cast<uint32_t>( 16 + (bItsNotMain * 8) + (it.second->GetNumEntries() * it.second->GetEntrySize()) + it.second->GetFormattedContentSize() );
+				dwCurrentOffset += static_cast<uint32_t>( sizeOfHeaders + (it.second->GetNumEntries() * it.second->GetEntrySize()) + it.second->GetFormattedContentSize() );
 
 				// Align to 4 bytes
 				dwCurrentOffset = (dwCurrentOffset + 4 - 1) & ~(4 - 1);
 
-				bItsNotMain = true;
+				sizeOfHeaders = 16 + 8;
 			}
 		}
 
 		// Write TKEY and TDAT sections
-		bool			bItsNotMain = false;
+		bool outputTableName = false; // Don't output for MAIN
 		for ( const auto& it : TablesMap )
 		{
-			if ( bItsNotMain )
+			if ( outputTableName )
 				OutputFile.write(it.first.cName, sizeof(it.first.cName));
 			else
-				bItsNotMain = true;
+				outputTableName = true;
 
 			{
 				const char		header[] = { 'T', 'K', 'E', 'Y' };
