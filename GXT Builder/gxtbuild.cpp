@@ -445,12 +445,12 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, 
 			if ( !FileLine.empty() && FileLine[0] != '#' )
 			{
 				// Extract entry name
-				std::string::size_type tabPos = FileLine.find_first_of('\t');
+				const std::string::size_type tabPos = FileLine.find_first_of('\t');
 				if ( tabPos == std::string::npos ) continue;
 
-				std::string		EntryName( FileLine.begin(), FileLine.begin()+tabPos );
-				std::string		EntryContent( FileLine.begin()+FileLine.find_first_not_of('\t', tabPos), FileLine.end() );
-				uint32_t	nEntryHash = crc32FromUpcaseString(EntryName.c_str());
+				const std::string EntryName = FileLine.substr(0, tabPos);
+				const std::string EntryContent = FileLine.substr(tabPos + 1);
+				const uint32_t nEntryHash = crc32FromUpcaseString(EntryName.c_str());
 
 				// Push entry into table map
 				if ( TableIt.second->InsertEntry( EntryName, static_cast<uint32_t>(utf8::distance( TableIt.second->Content.begin(), TableIt.second->Content.end()) ) ) )
