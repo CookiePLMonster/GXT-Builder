@@ -538,6 +538,8 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const CharMapArray& characterMap)
 {
 	for ( auto& it : TablesMap )
 	{
+		auto currentWordIterator = it.second->Content.begin();
+		auto lastWordIterator = currentWordIterator;
 		for ( utf8::iterator<std::string::iterator> strIt( it.second->Content.begin(), it.second->Content.begin(), it.second->Content.end() );
 				strIt.base() != it.second->Content.end(); ++strIt )
 		{
@@ -545,6 +547,8 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const CharMapArray& characterMap)
 			if ( *strIt == '\0' )
 			{
 				it.second->PushFormattedChar('\0');
+				lastWordIterator = currentWordIterator;
+				currentWordIterator = std::next(strIt.base(), 1);
 				continue;
 			}
 			for ( size_t i = 0; i < CHARACTER_MAP_SIZE; ++i )
@@ -559,8 +563,12 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const CharMapArray& characterMap)
 
 			if ( !bFound )
 			{
+				auto wordBegin = lastWordIterator;
+				auto wordEnd = wordBegin;
+				while ( *wordEnd != '\0' ) ++wordEnd;
+
 				std::ostringstream tmpstream;
-				tmpstream << "Can't locate character \"" << static_cast<wchar_t>(*strIt) << "\" (" << *strIt << ") in a character map!";
+				tmpstream << "Can't locate character \"" << static_cast<wchar_t>(*strIt) << "\" (" << *strIt << ") in a character map! Table: " << it.first.cName << ", last text \"" << std::string(wordBegin, wordEnd) << "\"";
 				throw std::runtime_error( tmpstream.str() );
 			}
 		}
