@@ -146,7 +146,32 @@ namespace SA
 	template<typename Character>
 	bool GXTTable<Character>::InsertEntry( const std::string& entryName, uint32_t offset )
 	{
-		uint32_t entryHash = crc32FromUpcaseString( entryName.c_str() );
+		bool success = false;
+		uint32_t entryHash;
+		// entryName can be a hexadecimal hash or a string, trying hash first (0x prefix is mandatory here)
+		if ( entryName.length() > 2 && 
+			entryName[0] == '0' && (entryName[1] == 'x' || entryName[1] == 'X') )
+		{
+			try
+			{
+				entryHash = std::stoul( entryName, nullptr, 16 );
+				success = true;
+			}
+			catch ( std::invalid_argument& )
+			{
+				// Deliberately left empty
+			}
+			catch ( std::out_of_range& )
+			{
+				// Deliberately left empty
+			}
+		}
+
+		if ( !success )
+		{
+			entryHash = crc32FromUpcaseString( entryName.c_str() );
+		}
+		
 		return Entries.emplace( entryHash, static_cast<uint32_t>(offset * sizeof(character_t)) ).second != false;
 	}
 
