@@ -766,7 +766,6 @@ int wmain(int argc, wchar_t* argv[])
 		LangName = GetFileNameNoExtension( LangName );
 
 		std::wcout << L"Building a file from " << LangName << L".ini, please wait...\n";
-		std::wcout << L"Used format: " << GetFormatName( fileVersion ) << L"\n";
 
 		LogFile.open(LangName + L"_build.log");
 
@@ -788,6 +787,9 @@ int wmain(int argc, wchar_t* argv[])
 		{
 			std::wstring	charMapName;
 			ParseINI( LangName, TablesMap, charMapName, fileVersion );
+
+			std::wcout << L"Used format: " << GetFormatName( fileVersion ) << L"\n";
+
 			const CharMapArray characterMap = ParseCharacterMap( charMapName );
 
 			if ( argc > firstStream )
