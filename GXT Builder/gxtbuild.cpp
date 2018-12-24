@@ -435,8 +435,10 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, 
 
 		if ( !MakeSureFileIsValid(InputFile) )
 		{
-			std::wcerr << L"ERROR: File " << pFileName << " contains invalid UTF-8 characters!\n";
-			return;
+			const std::wstring tmp(pFileName);
+			std::ostringstream tmpstream;
+			tmpstream << "File " << std::string(tmp.begin(), tmp.end()) << " contains invalid UTF-8 characters";
+			throw std::runtime_error( tmpstream.str() );
 		}
 
 		std::string		FileLine;
@@ -833,6 +835,10 @@ int wmain(int argc, wchar_t* argv[])
 		catch ( std::exception& e )
 		{
 			std::cerr << "ERROR: " << e.what();
+			if ( LogFile.is_open() && LogFile.good() )
+			{
+				LogFile << "ERROR: " << e.what();
+			}
 			return 1;
 		}
 	}
