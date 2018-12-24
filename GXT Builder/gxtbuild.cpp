@@ -695,7 +695,7 @@ std::wstring GetFileNameNoExtension(std::wstring path)
 	if ( namePos == std::wstring::npos )
 		path = path.substr( 0, extPos );
 	else
-		path = path.substr( namePos+1, extPos );
+		path = std::wstring( path.begin() + namePos+1, path.begin() + extPos );
 	return path;
 }
 
