@@ -550,7 +550,8 @@ void ApplyCharacterMap(tableMap_t& TablesMap, const CharMapArray& characterMap)
 			{
 				it.second->PushFormattedChar('\0');
 				lastWordIterator = currentWordIterator;
-				currentWordIterator = std::next(strIt.base(), 1);
+				currentWordIterator = strIt.base();
+				utf8::next( currentWordIterator, it.second->Content.end() );
 				continue;
 			}
 			for ( size_t i = 0; i < CHARACTER_MAP_SIZE; ++i )
