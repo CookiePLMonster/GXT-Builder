@@ -425,6 +425,26 @@ void ParseINI( std::wstring strFileName, tableMap_t& TableMap, std::wstring& cha
 	}
 }
 
+// Tokenize on space/tab
+static std::pair<std::string, std::string> TokenizeEntry( const std::string& line )
+{
+	std::string entry, content;
+
+	const size_t sepStart = line.find_first_of(" \t");
+	if ( sepStart != line.npos )
+	{
+		entry = line.substr(0, sepStart);
+
+		const size_t sepEnd = line.find_first_not_of(" \t", sepStart);
+		if ( sepEnd != line.npos )
+		{
+			content = line.substr(sepEnd);
+		}
+	}
+
+	return {entry, content};
+}
+
 void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, std::map<uint32_t,VersionControlMap>& MasterMap, std::forward_list<std::ofstream>& SlaveStreams, std::ofstream& LogFile, bool bMasterBuilding)
 {
 	std::ifstream		InputFile(pFileName, std::ifstream::in);
@@ -447,11 +467,13 @@ void LoadFileContent(const wchar_t* pFileName, tableMap_t::value_type& TableIt, 
 			if ( !FileLine.empty() && FileLine[0] != '#' )
 			{
 				// Extract entry name
-				const std::string::size_type tabPos = FileLine.find_first_of('\t');
-				if ( tabPos == std::string::npos ) continue;
+				// TODO: std::string_view and structured bindings
+				std::string EntryName;
+				std::string EntryContent;
+				std::tie(EntryName, EntryContent) = TokenizeEntry( FileLine );
 
-				const std::string EntryName = FileLine.substr(0, tabPos);
-				const std::string EntryContent = FileLine.substr(tabPos + 1);
+				if ( EntryName.empty() || EntryContent.empty() ) continue;
+
 				const uint32_t nEntryHash = crc32FromUpcaseString(EntryName.c_str());
 
 				// Push entry into table map
