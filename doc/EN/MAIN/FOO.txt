@@ -1,4 +1,4 @@
 # Lines preceeded with # are ignored
-# Entry name and text MUST be separated with a single tabulator (\t)!!!
+# Entry name and text must be separated by whitespace (tab or space)
 MYTEXT	The quick brown fox jumps over the lazy dog
 0x4267ADBE	Hashes are also supported
